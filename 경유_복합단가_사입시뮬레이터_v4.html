@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>경유 복합단가 사입 시뮬레이터 v2</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --ink:#1c2622; --paper:#f4f2ec; --line:#c9c2b2;
+    --tank:#2f5d50; --tank-soft:#e4ede9;
+    --danger:#a4442e; --danger-soft:#f6e6e0;
+    --safe:#2f5d50; --safe-soft:#e4ede9;
+    --amber:#a3782b; --amber-soft:#f4ecd9;
+    --mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Noto Sans KR','Malgun Gothic',sans-serif;line-height:1.5;padding:28px 16px 72px;}
+  .wrap{max-width:980px;margin:0 auto;}
+  header{margin-bottom:24px;border-bottom:2px solid var(--ink);padding-bottom:14px;}
+  header h1{font-size:24px;margin:0 0 6px;letter-spacing:-0.01em;}
+  header p{margin:0;color:#5a6058;font-size:13px;}
+
+  .dash-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:26px;}
+  @media (max-width:720px){.dash-grid{grid-template-columns:1fr;}}
+  .dash-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 18px;position:relative;}
+  .dash-card .name{font-size:14px;font-weight:700;margin-bottom:2px;}
+  .dash-card .date{font-size:11.5px;color:#8a8f86;margin-bottom:10px;}
+  .dash-card .row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;}
+  .dash-card .row .k{font-size:12px;color:#6b6f66;}
+  .dash-card .row .v{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--tank);}
+  .dash-card.empty .row .v{color:#b7bcae;font-size:14px;font-weight:400;}
+  .dash-card .status-dot{position:absolute;top:16px;right:16px;width:8px;height:8px;border-radius:50%;background:#c9c2b2;}
+  .dash-card.loaded .status-dot{background:var(--safe);}
+  .dash-card.error .status-dot{background:var(--danger);}
+  .dash-top-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .dash-top-row h2{font-size:16px;margin:0;}
+
+  .section-title{font-size:15px;font-weight:700;margin:28px 0 10px;display:flex;align-items:center;gap:8px;}
+  .section-title .num{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:22px;height:22px;border-radius:50%;background:var(--tank);color:#fff;font-size:12px;flex:none;
+  }
+
+  .card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin-bottom:4px;}
+  .card + .card{margin-top:14px;}
+  .card h3{font-size:13px;margin:0 0 12px;color:#6b6f66;font-weight:600;}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+  @media (max-width:720px){.grid2,.grid3,.grid4{grid-template-columns:1fr;}}
+
+  .field{margin-bottom:12px;}
+  .field:last-child{margin-bottom:0;}
+  .field label{display:block;font-size:12.5px;margin-bottom:5px;color:#3d453e;}
+  input[type=number], input[type=text], select{
+    width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:6px;
+    font-family:var(--mono);font-size:15px;background:#fbfaf6;color:var(--ink);
+  }
+  input:focus, select:focus{outline:2px solid var(--tank);outline-offset:1px;}
+  input[readonly]{background:#f0efe9;color:#6b6f66;}
+
+  .file-drop{
+    border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;
+    background:#fbfaf6;cursor:pointer;
+  }
+  .file-drop:hover{border-color:var(--tank);}
+  .file-drop input{display:none;}
+  .file-drop .hint{font-size:12px;color:#8a8f86;margin-top:6px;}
+
+  .match-list{margin-top:14px;display:flex;flex-direction:column;gap:8px;}
+  .match-item{border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:13px;background:#fbfaf6;}
+  .match-item.ok{border-color:var(--safe);background:var(--safe-soft);}
+  .match-item.bad{border-color:var(--danger);background:var(--danger-soft);}
+  .match-item .title{font-weight:700;margin-bottom:3px;}
+  .match-item .detail{color:#4b5148;font-family:var(--mono);font-size:12.5px;}
+
+  .tabs{display:flex;gap:0;margin:16px 0;border:1px solid var(--ink);border-radius:8px;overflow:hidden;flex-wrap:wrap;}
+  .tab{flex:1;min-width:90px;padding:11px 6px;text-align:center;cursor:pointer;background:var(--paper);font-size:14px;font-weight:600;color:#6b6f66;border-right:1px solid var(--ink);}
+  .tab:last-child{border-right:none;}
+  .tab.active{background:var(--tank);color:#fff;}
+  .tab small{display:block;font-weight:400;font-size:10.5px;margin-top:2px;}
+
+  .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:12px;font-weight:700;}
+  .badge.safe{background:var(--safe-soft);color:var(--safe);}
+  .badge.warn{background:var(--amber-soft);color:var(--amber);}
+  .badge.bad{background:var(--danger-soft);color:var(--danger);}
+
+  .result{border-radius:10px;padding:20px;border:1px solid var(--line);margin-bottom:16px;}
+  .result.safe{background:var(--safe-soft);border-color:var(--safe);}
+  .result.warn{background:var(--amber-soft);border-color:var(--amber);}
+  .result.bad{background:var(--danger-soft);border-color:var(--danger);}
+  .result .headline{font-size:13.5px;color:#4b5148;margin-bottom:6px;}
+  .result .big{font-family:var(--mono);font-size:32px;font-weight:700;line-height:1.15;}
+  .result.safe .big{color:var(--safe);}
+  .result.warn .big{color:var(--amber);}
+  .result.bad .big{color:var(--danger);}
+  .result .sub{font-size:13px;margin-top:8px;color:#4b5148;}
+
+  .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px;}
+  @media (max-width:720px){.stat-row{grid-template-columns:1fr 1fr;}}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px 14px;}
+  .stat .label{font-size:11.5px;color:#8a8f86;margin-bottom:4px;}
+  .stat .value{font-family:var(--mono);font-size:19px;font-weight:700;}
+  .stat .sub{font-size:11px;color:#8a8f86;margin-top:2px;}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  th,td{padding:8px 9px;text-align:right;border-bottom:1px solid var(--line);font-family:var(--mono);}
+  th:first-child,td:first-child{text-align:left;font-family:inherit;}
+  thead th{color:#6b6f66;font-weight:600;font-size:11.5px;border-bottom:2px solid var(--ink);}
+  tr.mark td{background:var(--tank-soft);font-weight:700;color:var(--tank);}
+  tr.over td{color:var(--danger);}
+  .table-wrap{overflow-x:auto;}
+
+  .note{font-size:12px;color:#7a8078;margin-top:10px;}
+  .explain{font-size:13px;color:#3d453e;background:#fbfaf6;border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-top:12px;}
+
+  .row-line{display:flex;gap:8px;align-items:flex-end;margin-bottom:8px;flex-wrap:wrap;}
+  .row-line .field{flex:1;min-width:110px;margin-bottom:0;}
+  .row-line .rm{flex:none;}
+
+  button{
+    font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;
+    border:1px solid var(--ink);background:#fff;color:var(--ink);border-radius:6px;padding:8px 14px;
+  }
+  button:hover{background:var(--ink);color:#fff;}
+  button.primary{background:var(--tank);color:#fff;border-color:var(--tank);}
+  button.primary:hover{opacity:0.88;}
+  button.danger-outline{border-color:var(--danger);color:var(--danger);background:#fff;}
+  button.danger-outline:hover{background:var(--danger);color:#fff;}
+
+  .toggle-row{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:10px;}
+  .toggle-row input[type=checkbox]{width:16px;height:16px;}
+
+  svg text{font-family:var(--mono);font-size:11px;fill:#6b6f66;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>경유 복합단가 사입 시뮬레이터 v2</h1>
+  <p>엑셀을 업로드하면 저장소별 최신 재고·복합단가를 자동으로 읽고, 엑셀이 없어도 직접 입력해 동일한 계산을 사용할 수 있습니다. 모든 계산은 브라우저에서만 처리되며 파일은 서버로 전송되지 않습니다.</p>
+</header>
+
+<div class="dash-top-row">
+  <h2>저장소 현황</h2>
+  <button id="reloadDataBtn">데이터 다시 불러오기</button>
+</div>
+<div class="dash-grid" id="dashboardGrid"></div>
+<p class="note" id="dashboardNote" style="margin:-14px 0 20px;"></p>
+
+
+<div class="section-title"><span class="num">1</span>엑셀 수동 업로드 (자동 불러오기 실패 시 / 임시 확인용)</div>
+<div class="card">
+  <p class="note" style="margin-top:0;">위 "저장소 현황"은 이 웹앱과 같은 위치의 <code>data/</code> 폴더에 있는 엑셀 파일을 자동으로 읽어옵니다. 저장소 파일을 새 버전으로 교체하고 GitHub에 커밋 → Vercel에 재배포하면, 이 페이지에 접속하는 모든 사람이 최신 데이터를 보게 됩니다. 아래 업로드는 자동 불러오기가 안 될 때 또는 임시로 다른 값을 확인해볼 때만 사용하세요.</p>
+  <div class="file-drop" id="dropZone">
+    <div>클릭하거나 파일을 끌어다 놓으세요 (여러 개 선택 가능)</div>
+    <div class="hint">파일명에 "침산" / "단지" / "신도시"가 포함되어 있으면 자동으로 저장소를 인식합니다. 포함되어 있지 않으면 아래에서 직접 지정할 수 있습니다.</div>
+  </div>
+  <input type="file" id="fileInput" multiple accept=".xlsx,.xls" style="display:none;">
+  <div class="match-list" id="matchList"></div>
+  <button id="resetUploads" class="danger-outline" style="margin-top:10px;display:none;">업로드 전체 초기화</button>
+</div>
+
+<div class="section-title"><span class="num">2</span>공통 조건</div>
+<div class="card">
+  <div class="grid4">
+    <div class="field">
+      <label>신규 사입단가 (원/L)</label>
+      <input type="number" id="buyPrice" step="1">
+    </div>
+    <div class="field">
+      <label>목표 복합단가 (원/L)</label>
+      <input type="number" id="targetPrice" step="1">
+    </div>
+    <div class="field">
+      <label>1대 기준 수량 (L)</label>
+      <input type="number" id="truckSize" step="1000">
+    </div>
+    <div class="field">
+      <label>&nbsp;</label>
+      <div class="toggle-row" style="margin-top:9px;">
+        <input type="checkbox" id="safetyOn">
+        <label for="safetyOn" style="margin:0;">안전여유 적용</label>
+        <input type="number" id="safetyPct" style="width:70px;" value="5" step="1"> %
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section-title"><span class="num">3</span>저장소 선택 &amp; 현재 재고 상태</div>
+<div class="tabs" id="storageTabs"></div>
+<div class="card">
+  <div class="grid3">
+    <div class="field" id="dateFieldWrap" style="display:none;">
+      <label>기준일자 (엑셀 인식)</label>
+      <select id="dateSelect"></select>
+    </div>
+    <div class="field">
+      <label>현재 경유 재고 (L)</label>
+      <input type="number" id="stockInput" step="1">
+    </div>
+    <div class="field">
+      <label>현재 복합단가 (원/L)</label>
+      <input type="number" id="priceInput" step="0.01">
+    </div>
+  </div>
+  <div class="note" id="sourceNote">직접 입력 모드입니다.</div>
+</div>
+
+<div class="section-title"><span class="num">4</span>핵심 결과</div>
+<div id="mainResult"></div>
+<div class="stat-row" id="mainStats"></div>
+<div class="explain" id="mainExplain"></div>
+
+<div class="section-title"><span class="num">5</span>사입량에 따른 복합단가 변화</div>
+<div class="card">
+  <svg id="chartSvg" viewBox="0 0 640 260" width="100%" style="max-width:640px;display:block;margin:0 auto;"></svg>
+</div>
+
+<div class="section-title"><span class="num">6</span>분할입고 시뮬레이션</div>
+<div class="card">
+  <div class="field" style="max-width:280px;">
+    <label>기준 저장소 (이 저장소의 재고·복합단가에서 시작)</label>
+    <select id="splitStorageSelect"></select>
+  </div>
+  <div class="note" id="splitBaseInfo" style="margin-bottom:12px;"></div>
+  <p class="note">위에서 고른 저장소의 재고·복합단가를 시작점으로, 아래 입력한 순서대로 입고와 판매를 순차 반영합니다. (섹션 3의 탭과는 별개로 동작합니다)</p>
+  <div id="splitRows"></div>
+  <button id="addSplitRow" style="margin-top:6px;">+ 행 추가</button>
+  <div class="table-wrap" style="margin-top:14px;">
+    <table>
+      <thead><tr><th>날짜</th><th>입고량(L)</th><th>판매량(L)</th><th>예상재고(L)</th><th>예상 복합단가</th><th>목표대비</th><th>상태</th></tr></thead>
+      <tbody id="splitResultBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="section-title"><span class="num">7</span>전체 저장소 비교</div>
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>저장소</th><th>기준일</th><th>재고(L)</th><th>현재단가</th><th>목표단가</th><th>사입단가</th><th>최대사입량(L)</th><th>정수대수</th><th>상태</th></tr></thead>
+      <tbody id="allCompareBody"></tbody>
+    </table>
+  </div>
+</div>
+
+</div>
+
+
+<script>
+/* ===================== 공통 유틸 ===================== */
+function normalize(s){ return String(s).replace(/\s+/g,''); }
+function toNum(v){ const n = parseFloat(v); return isFinite(n) ? n : null; }
+function fmt(n, digits=0){
+  if(n==null || !isFinite(n)) return '-';
+  return Number(n).toLocaleString('ko-KR', {maximumFractionDigits:digits, minimumFractionDigits:digits});
+}
+function round2(n){ return Math.round(n*100)/100; }
+
+/* ===================== 계산 엔진 (공통) ===================== */
+function blendPrice(S, P, x, p){
+  const total = S + x;
+  if(total <= 0) return null;
+  return (S*P + x*p) / total;
+}
+
+// 목표단가까지 최대 사입량 역산
+function solveMaxIntake(S, P, p, T){
+  if(S==null || P==null || p==null || T==null){
+    return {status:'no-data', x:null, message:'재고 / 현재단가 / 사입단가 / 목표단가를 모두 입력해야 계산할 수 있습니다.'};
+  }
+  if(P >= T){
+    return {status:'already', x:0, message:'현재 복합단가가 이미 목표단가 이상입니다. 사입 전에 재검토가 필요합니다.'};
+  }
+  if(Math.abs(p - T) < 1e-9){
+    return {status:'flat', x:Infinity, message:'신규 사입단가가 목표단가와 같습니다. 사입량이 늘어도 복합단가는 목표단가에 가까워질 뿐 초과하지 않습니다.'};
+  }
+  if(p < T){
+    return {status:'no-risk', x:Infinity, message:'신규 사입단가(' + fmt(p) + '원)가 목표단가(' + fmt(T) + '원)보다 낮습니다. 사입량을 늘려도 목표단가를 초과할 위험이 없습니다.'};
+  }
+  // P < T < p
+  const x = S * (T - P) / (p - T);
+  if(x < 0){
+    return {status:'unreachable', x:null, message:'입력 조건에서는 목표단가에 도달하는 사입량이 존재하지 않습니다.'};
+  }
+  return {status:'ok', x, message:''};
+}
+
+function truckBreakdown(x, truckSize){
+  if(!isFinite(x) || x==null || !truckSize) return null;
+  const theoretical = x / truckSize;
+  const intTrucks = Math.floor(theoretical + 1e-9);
+  return {theoretical, intTrucks};
+}
+
+/* ===================== 엑셀 파서 (구조 기반, 셀 주소 하드코딩 없음) ===================== */
+function extractDateKey(sheetName){
+  const m = String(sheetName).match(/^(\d{2})(\d{2})/);
+  if(!m) return null;
+  const month = parseInt(m[1],10), day = parseInt(m[2],10);
+  if(month<1||month>12||day<1||day>31) return null;
+  const idx = (month===12?0:month)*100 + day;
+  return {idx, month, day, label: month + '/' + day};
+}
+
+function findDieselInRows(rows){
+  let titleRow = -1;
+  for(let r=0;r<rows.length;r++){
+    const row = rows[r] || [];
+    for(let c=0;c<row.length;c++){
+      if(row[c]!=null && normalize(row[c])==='재고현황'){ titleRow = r; break; }
+    }
+    if(titleRow>=0) break;
+  }
+  if(titleRow<0) return {found:false, reason:'재고현황 섹션을 찾지 못함'};
+
+  const endRow = Math.min(rows.length, titleRow+20);
+  let priceCol=-1, stockCol=-1;
+  for(let r=titleRow;r<endRow;r++){
+    const row = rows[r] || [];
+    for(let c=0;c<row.length;c++){
+      const val = row[c];
+      if(val==null) continue;
+      const n = normalize(val);
+      if(n==='복합단가' && priceCol<0) priceCol = c;
+      if(n==='마감재고' && stockCol<0) stockCol = c;
+    }
+  }
+  if(priceCol<0 || stockCol<0) return {found:false, reason:'마감재고/복합단가 헤더를 찾지 못함'};
+
+  for(let r=titleRow;r<endRow;r++){
+    const row = rows[r] || [];
+    for(let c=0;c<row.length;c++){
+      const val = row[c];
+      if(val==null) continue;
+      if(normalize(val)==='경유'){
+        const stockVal = row[stockCol];
+        const priceVal = row[priceCol];
+        const stock = typeof stockVal==='number' ? stockVal : null;
+        const price = typeof priceVal==='number' ? round2(priceVal) : null;
+        if(stock==null || price==null) return {found:true, stock:null, price:null, reason:'경유 행은 찾았으나 값이 비어있거나 오류(#REF! 등)'};
+        return {found:true, stock, price};
+      }
+    }
+  }
+  return {found:false, reason:'경유 행을 찾지 못함'};
+}
+
+function guessStorageName(fileName){
+  if(fileName.includes('침산')) return '침산저장소';
+  if(fileName.includes('단지')) return '단지저장소';
+  if(fileName.includes('신도시')) return '신도시저장소';
+  return null;
+}
+
+/* ===================== 전역 상태 ===================== */
+const TAB_NAMES = ['침산저장소','단지저장소','신도시저장소','직접입력'];
+const STORAGES = {}; // name -> {history:{idx:{idx,label,sheetName,stock,price}}, sortedIdx:[...], fileName}
+const tabState = {}; // name -> {selectedIdx, stock, price}
+TAB_NAMES.forEach(n => tabState[n] = {selectedIdx:null, stock:null, price:null});
+
+let activeTab = '침산저장소';
+
+const settings = {
+  buyPrice: 1773,
+  targetPrice: 1700,
+  truckSize: 32000,
+  safetyOn: false,
+  safetyPct: 5,
+};
+
+/* ===================== LocalStorage ===================== */
+const LS_KEY = 'dieselSimV2';
+function saveLocal(){
+  try{
+    const manual = {};
+    TAB_NAMES.forEach(n=>{
+      if(!STORAGES[n]) manual[n] = {stock: tabState[n].stock, price: tabState[n].price};
+    });
+    localStorage.setItem(LS_KEY, JSON.stringify({settings, manual, activeTab}));
+  }catch(e){}
+}
+function loadLocal(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(!raw) return;
+    const data = JSON.parse(raw);
+    if(data.settings) Object.assign(settings, data.settings);
+    if(data.activeTab) activeTab = data.activeTab;
+    if(data.manual){
+      Object.keys(data.manual).forEach(n=>{
+        if(tabState[n]){
+          tabState[n].stock = data.manual[n].stock;
+          tabState[n].price = data.manual[n].price;
+        }
+      });
+    }
+  }catch(e){}
+}
+
+/* ===================== 워크북 공통 파싱 ===================== */
+function parseWorkbookForDiesel(wb){
+  const history = {};
+  let firstError = null;
+  wb.SheetNames.forEach(sheetName=>{
+    const dk = extractDateKey(sheetName);
+    if(!dk) return;
+    const ws = wb.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
+    const res = findDieselInRows(rows);
+    if(res.found && res.stock!=null && res.price!=null){
+      history[dk.idx] = {idx:dk.idx, label:dk.label, sheetName, stock:res.stock, price:res.price};
+    } else if(!firstError){
+      firstError = res.reason;
+    }
+  });
+  const sortedIdx = Object.keys(history).map(Number).sort((a,b)=>a-b);
+  return {history, sortedIdx, firstError};
+}
+
+/* ===================== 엑셀 업로드 처리 ===================== */
+const matchListEl = document.getElementById('matchList');
+const fileInput = document.getElementById('fileInput');
+const dropZone = document.getElementById('dropZone');
+const resetUploadsBtn = document.getElementById('resetUploads');
+
+// matchLog: 파일 하나당 하나의 항목. 같은 파일명을 다시 올리면 이전 항목을 덮어씀(누적 방지).
+// { key: fileName, status:'ok'|'bad'|'pending', detail, tempStorageName?, history?, sortedIdx? }
+const matchLog = {};
+
+dropZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => { handleFiles(e.target.files); });
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = 'var(--tank)'; });
+dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = ''; });
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.style.borderColor = '';
+  if(e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+});
+resetUploadsBtn.addEventListener('click', () => {
+  Object.keys(STORAGES).forEach(k => delete STORAGES[k]);
+  Object.keys(matchLog).forEach(k => delete matchLog[k]);
+  TAB_NAMES.forEach(n => { if(n!=='직접입력'){ tabState[n] = {selectedIdx:null, stock:null, price:null}; } });
+  renderMatchList();
+  renderTabs();
+  renderStockCard();
+  renderSplitStorageSelect();
+  renderDashboard();
+  recalcAll();
+  autoLoadAll(); // data/ 폴더 자동 데이터를 다시 불러와 복원
+});
+
+function handleFiles(fileList){
+  const files = Array.from(fileList);
+  if(files.length===0) return;
+  files.forEach(file=>{
+    matchLog[file.name] = {status:'pending', detail:'분석 중…'};
+  });
+  renderMatchList();
+
+  files.forEach(file=>{
+    const reader = new FileReader();
+    reader.onload = evt => {
+      try{
+        const data = new Uint8Array(evt.target.result);
+        const wb = XLSX.read(data, {type:'array'});
+        const {history, sortedIdx, firstError} = parseWorkbookForDiesel(wb);
+        if(sortedIdx.length===0){
+          matchLog[file.name] = {status:'bad', detail:'경유 데이터를 찾지 못했습니다' + (firstError? (' (' + firstError + ')') : '')};
+          renderMatchList();
+          return;
+        }
+        const guess = guessStorageName(file.name);
+        if(guess){
+          commitStorage(guess, file.name, history, sortedIdx);
+          const latest = history[sortedIdx[sortedIdx.length-1]];
+          matchLog[file.name] = {status:'ok', detail:guess + ' 로 자동 인식됨 · 최신일자 ' + latest.label + ' (시트 ' + latest.sheetName + ')  ·  경유 재고 ' + fmt(latest.stock) + 'L  ·  복합단가 ' + fmt(latest.price,2) + '원'};
+        } else {
+          // 파일명으로 저장소를 판단할 수 없음 → 사용자가 직접 지정
+          matchLog[file.name] = {status:'assign', detail:'파일명으로 저장소를 판단할 수 없습니다. 아래에서 저장소를 지정하세요.', history, sortedIdx, fileName:file.name};
+        }
+      }catch(err){
+        matchLog[file.name] = {status:'bad', detail:'엑셀 분석 중 오류: ' + err.message};
+      } finally {
+        renderMatchList();
+        renderTabs();
+        renderStockCard();
+        renderSplitStorageSelect();
+        renderDashboard();
+        recalcAll();
+      }
+    };
+    reader.onerror = () => {
+      matchLog[file.name] = {status:'bad', detail:'파일을 읽는 중 오류가 발생했습니다.'};
+      renderMatchList();
+    };
+    reader.readAsArrayBuffer(file);
+  });
+
+  // 같은 파일을 다시 선택해도 change 이벤트가 발생하도록 초기화
+  fileInput.value = '';
+}
+
+function commitStorage(name, fileName, history, sortedIdx){
+  STORAGES[name] = {history, sortedIdx, fileName};
+  const latest = history[sortedIdx[sortedIdx.length-1]];
+  if(!tabState[name]) tabState[name] = {selectedIdx:null, stock:null, price:null};
+  tabState[name].selectedIdx = sortedIdx[sortedIdx.length-1];
+  tabState[name].stock = latest.stock;
+  tabState[name].price = latest.price;
+}
+
+function assignPendingFile(fileName, chosenName){
+  const entry = matchLog[fileName];
+  if(!entry || !entry.history) return;
+  commitStorage(chosenName, fileName, entry.history, entry.sortedIdx);
+  const latest = entry.history[entry.sortedIdx[entry.sortedIdx.length-1]];
+  matchLog[fileName] = {status:'ok', detail:chosenName + ' 로 지정됨 · 최신일자 ' + latest.label + ' (시트 ' + latest.sheetName + ')  ·  경유 재고 ' + fmt(latest.stock) + 'L  ·  복합단가 ' + fmt(latest.price,2) + '원'};
+  renderMatchList();
+  renderTabs();
+  renderStockCard();
+  renderSplitStorageSelect();
+  renderDashboard();
+  recalcAll();
+}
+
+function renderMatchList(){
+  matchListEl.innerHTML = '';
+  const keys = Object.keys(matchLog);
+  resetUploadsBtn.style.display = keys.length ? '' : 'none';
+  keys.forEach(fileName=>{
+    const entry = matchLog[fileName];
+    const div = document.createElement('div');
+    if(entry.status==='ok'){
+      div.className = 'match-item ok';
+      div.innerHTML = '<div class="title">✓ ' + fileName + '</div><div class="detail">' + entry.detail + '</div>';
+    } else if(entry.status==='pending'){
+      div.className = 'match-item';
+      div.innerHTML = '<div class="title">⏳ ' + fileName + '</div><div class="detail">' + entry.detail + '</div>';
+    } else if(entry.status==='assign'){
+      div.className = 'match-item';
+      const selId = 'assign-' + Math.random().toString(36).slice(2);
+      div.innerHTML =
+        '<div class="title">? ' + fileName + '</div>' +
+        '<div class="detail" style="margin-bottom:8px;">' + entry.detail + '</div>' +
+        '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
+        '<select id="' + selId + '"><option value="침산저장소">침산저장소</option><option value="단지저장소">단지저장소</option><option value="신도시저장소">신도시저장소</option></select>' +
+        '<button data-apply="' + fileName + '" data-sel="' + selId + '">이 저장소로 지정</button>' +
+        '</div>';
+    } else {
+      div.className = 'match-item bad';
+      div.innerHTML = '<div class="title">✗ ' + fileName + '</div><div class="detail">' + entry.detail + '</div>';
+    }
+    matchListEl.appendChild(div);
+  });
+  matchListEl.querySelectorAll('[data-apply]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const fileName = btn.getAttribute('data-apply');
+      const sel = document.getElementById(btn.getAttribute('data-sel'));
+      assignPendingFile(fileName, sel.value);
+    });
+  });
+}
+
+/* ===================== data/ 폴더 자동 불러오기 ===================== */
+// 이 웹앱 파일과 같은 위치의 data/ 폴더에 아래 파일명으로 저장소 엑셀을 올려두면
+// 페이지가 열릴 때(또는 "다시 불러오기" 클릭 시) 자동으로 읽어옵니다.
+// 파일명은 자유롭게 바꿔도 되며, 그럴 경우 아래 경로만 맞춰 수정하면 됩니다.
+const DATA_FILES = {
+  '침산저장소': 'data/침산.xlsx',
+  '단지저장소': 'data/단지.xlsx',
+  '신도시저장소': 'data/신도시.xlsx',
+};
+const autoLoadStatus = {}; // name -> {status:'loading'|'ok'|'missing'|'error', detail}
+
+async function autoLoadAll(){
+  const dashboardNote = document.getElementById('dashboardNote');
+  dashboardNote.textContent = '데이터 불러오는 중…';
+  Object.keys(DATA_FILES).forEach(name=>{ autoLoadStatus[name] = {status:'loading'}; });
+  renderDashboard();
+
+  await Promise.all(Object.entries(DATA_FILES).map(async ([name, path])=>{
+    try{
+      const res = await fetch(path + '?t=' + Date.now(), {cache:'no-store'});
+      if(!res.ok){
+        autoLoadStatus[name] = {status:'missing', detail: path + ' 파일이 없습니다 (' + res.status + ')'};
+        return;
+      }
+      const buf = await res.arrayBuffer();
+      const wb = XLSX.read(new Uint8Array(buf), {type:'array'});
+      const {history, sortedIdx, firstError} = parseWorkbookForDiesel(wb);
+      if(sortedIdx.length===0){
+        autoLoadStatus[name] = {status:'error', detail:'경유 데이터를 찾지 못함' + (firstError?(' ('+firstError+')'):'')};
+        return;
+      }
+      commitStorage(name, path, history, sortedIdx);
+      const latest = history[sortedIdx[sortedIdx.length-1]];
+      autoLoadStatus[name] = {status:'ok', detail:'자동 로드됨'};
+    }catch(err){
+      autoLoadStatus[name] = {status:'error', detail:'자동 로드 실패: ' + err.message + ' (file:// 로 직접 열면 브라우저 보안정책 때문에 실패할 수 있습니다. Vercel 배포 후 접속해서 확인하세요.)'};
+    }
+  }));
+
+  dashboardNote.textContent = 'data/ 폴더의 엑셀 파일을 새 버전으로 교체하고 GitHub에 커밋 → 재배포하면 이 화면도 함께 갱신됩니다.';
+  renderDashboard();
+  renderTabs();
+  renderStockCard();
+  renderSplitStorageSelect();
+  recalcAll();
+}
+
+document.getElementById('reloadDataBtn').addEventListener('click', autoLoadAll);
+
+/* ===================== 대시보드 렌더 ===================== */
+function renderDashboard(){
+  const grid = document.getElementById('dashboardGrid');
+  grid.innerHTML = '';
+  Object.keys(DATA_FILES).forEach(name=>{
+    const st = STORAGES[name];
+    const auto = autoLoadStatus[name];
+    const div = document.createElement('div');
+    let cls = 'dash-card empty';
+    let dateLabel = '-';
+    let stockVal = '-';
+    let priceVal = '-';
+
+    if(st){
+      const latest = st.history[st.sortedIdx[st.sortedIdx.length-1]];
+      cls = 'dash-card loaded';
+      dateLabel = latest.label + ' 기준 (' + latest.sheetName + ')';
+      stockVal = fmt(latest.stock) + ' L';
+      priceVal = fmt(latest.price,2) + ' 원/L';
+    } else if(auto && auto.status==='loading'){
+      dateLabel = '불러오는 중…';
+    } else if(auto && (auto.status==='missing' || auto.status==='error')){
+      cls = 'dash-card empty error';
+      dateLabel = auto.detail;
+    } else {
+      dateLabel = 'data/ 폴더에 파일 없음 · 수동 업로드로 보완 가능';
+    }
+
+    div.className = cls;
+    div.innerHTML =
+      '<div class="status-dot"></div>' +
+      '<div class="name">' + name + '</div>' +
+      '<div class="date">' + dateLabel + '</div>' +
+      '<div class="row"><span class="k">경유 마감재고</span><span class="v">' + stockVal + '</span></div>' +
+      '<div class="row"><span class="k">복합단가</span><span class="v">' + priceVal + '</span></div>';
+    grid.appendChild(div);
+  });
+}
+
+/* ===================== 탭 & 재고카드 렌더 ===================== */
+const storageTabsEl = document.getElementById('storageTabs');
+function renderTabs(){
+  storageTabsEl.innerHTML = '';
+  TAB_NAMES.forEach(name=>{
+    const div = document.createElement('div');
+    div.className = 'tab' + (name===activeTab?' active':'');
+    const sub = STORAGES[name] ? '엑셀 인식됨' : (name==='직접입력' ? '수동 입력' : '수동/미업로드');
+    div.innerHTML = name + '<small>' + sub + '</small>';
+    div.onclick = () => { activeTab = name; renderTabs(); renderStockCard(); recalcAll(); saveLocal(); };
+    storageTabsEl.appendChild(div);
+  });
+}
+
+const dateFieldWrap = document.getElementById('dateFieldWrap');
+const dateSelect = document.getElementById('dateSelect');
+const stockInput = document.getElementById('stockInput');
+const priceInput = document.getElementById('priceInput');
+const sourceNote = document.getElementById('sourceNote');
+
+function renderStockCard(){
+  const st = STORAGES[activeTab];
+  const ts = tabState[activeTab];
+  if(st){
+    dateFieldWrap.style.display = '';
+    dateSelect.innerHTML = '';
+    st.sortedIdx.slice().reverse().forEach(idx=>{
+      const h = st.history[idx];
+      const opt = document.createElement('option');
+      opt.value = idx;
+      opt.textContent = h.label + ' (' + h.sheetName + ')';
+      if(idx === ts.selectedIdx) opt.selected = true;
+      dateSelect.appendChild(opt);
+    });
+    sourceNote.textContent = '엑셀 파일 "' + st.fileName + '"에서 자동 추출됨. 값은 직접 수정할 수 있습니다.';
+  } else {
+    dateFieldWrap.style.display = 'none';
+    sourceNote.textContent = activeTab==='직접입력' ? '엑셀 없이 직접 입력하는 범용 계산기입니다.' : '해당 저장소의 엑셀이 아직 업로드되지 않았습니다. 값을 직접 입력하세요.';
+  }
+  stockInput.value = ts.stock ?? '';
+  priceInput.value = ts.price ?? '';
+}
+
+dateSelect.addEventListener('change', ()=>{
+  const st = STORAGES[activeTab];
+  if(!st) return;
+  const idx = parseInt(dateSelect.value,10);
+  const h = st.history[idx];
+  tabState[activeTab].selectedIdx = idx;
+  tabState[activeTab].stock = h.stock;
+  tabState[activeTab].price = h.price;
+  stockInput.value = h.stock;
+  priceInput.value = h.price;
+  recalcAll();
+});
+stockInput.addEventListener('input', ()=>{ tabState[activeTab].stock = toNum(stockInput.value); recalcAll(); saveLocal(); });
+priceInput.addEventListener('input', ()=>{ tabState[activeTab].price = toNum(priceInput.value); recalcAll(); saveLocal(); });
+
+/* ===================== 공통 조건 입력 바인딩 ===================== */
+const buyPriceEl = document.getElementById('buyPrice');
+const targetPriceEl = document.getElementById('targetPrice');
+const truckSizeEl = document.getElementById('truckSize');
+const safetyOnEl = document.getElementById('safetyOn');
+const safetyPctEl = document.getElementById('safetyPct');
+
+function bindSettingsUI(){
+  buyPriceEl.value = settings.buyPrice;
+  targetPriceEl.value = settings.targetPrice;
+  truckSizeEl.value = settings.truckSize;
+  safetyOnEl.checked = settings.safetyOn;
+  safetyPctEl.value = settings.safetyPct;
+}
+[buyPriceEl,targetPriceEl,truckSizeEl,safetyPctEl].forEach(el=>{
+  el.addEventListener('input', ()=>{
+    settings.buyPrice = toNum(buyPriceEl.value);
+    settings.targetPrice = toNum(targetPriceEl.value);
+    settings.truckSize = toNum(truckSizeEl.value) || 32000;
+    settings.safetyPct = toNum(safetyPctEl.value) || 0;
+    recalcAll(); saveLocal();
+  });
+});
+safetyOnEl.addEventListener('change', ()=>{ settings.safetyOn = safetyOnEl.checked; recalcAll(); saveLocal(); });
+
+/* ===================== 메인 결과 렌더 ===================== */
+const mainResultEl = document.getElementById('mainResult');
+const mainStatsEl = document.getElementById('mainStats');
+const mainExplainEl = document.getElementById('mainExplain');
+
+function currentSP(){
+  return { S: tabState[activeTab].stock, P: tabState[activeTab].price };
+}
+
+function renderMain(){
+  const {S,P} = currentSP();
+  const p = settings.buyPrice, T = settings.targetPrice, truckSize = settings.truckSize;
+  const solve = solveMaxIntake(S,P,p,T);
+
+  let cls = 'warn', headline='', big='', sub='';
+  if(solve.status==='no-data'){
+    cls='warn'; headline='입력값 부족'; big='계산 불가'; sub=solve.message;
+  } else if(solve.status==='already'){
+    cls='bad'; headline='주의'; big='이미 목표단가 이상'; sub=solve.message;
+  } else if(solve.status==='no-risk' || solve.status==='flat'){
+    cls='safe'; headline='목표단가 초과 위험 없음'; big='제한 없음'; sub=solve.message;
+  } else if(solve.status==='unreachable'){
+    cls='bad'; headline='목표 도달 불가'; big='조건 재확인 필요'; sub=solve.message;
+  } else {
+    cls='safe';
+    const tb = truckBreakdown(solve.x, truckSize);
+    headline = '목표단가까지 최대 사입 가능량';
+    big = fmt(solve.x) + ' L';
+    sub = '약 ' + fmt(tb.theoretical,2) + '대 (1대 = ' + fmt(truckSize) + 'L 기준)';
+  }
+  mainResultEl.innerHTML = '<div class="result ' + cls + '"><div class="headline">' + headline + '</div><div class="big">' + big + '</div><div class="sub">' + sub + '</div></div>';
+
+  // 통계 카드: 이론대수 / 정수대수 / N대 입고후 단가 / N+1대 입고후 단가
+  mainStatsEl.innerHTML = '';
+  mainExplainEl.innerHTML = '';
+  if(solve.status!=='ok') return;
+
+  const tb = truckBreakdown(solve.x, truckSize);
+  const nTrucks = tb.intTrucks;
+  const nPlus = nTrucks + 1;
+  const qtyN = nTrucks * truckSize;
+  const qtyNPlus = nPlus * truckSize;
+  const priceN = blendPrice(S,P,qtyN,p);
+  const priceNPlus = blendPrice(S,P,qtyNPlus,p);
+  const overN = priceN > T;
+  const overNPlus = priceNPlus > T;
+
+  const stats = [
+    {label:'이론상 차량 수', value: fmt(tb.theoretical,2) + '대', sub:'소수점 포함 최대치'},
+    {label:'실제 정수 차량 기준', value: fmt(nTrucks) + '대', sub: fmt(qtyN) + 'L'},
+    {label: nTrucks + '대 입고 후 복합단가', value: fmt(priceN,2) + '원', sub: overN? '🔴 목표 초과' : '🟢 목표 이내'},
+    {label: nPlus + '대 입고 후 복합단가', value: fmt(priceNPlus,2) + '원', sub: overNPlus? '🔴 목표 초과' : '🟢 목표 이내'},
+  ];
+  stats.forEach(s=>{
+    const div = document.createElement('div');
+    div.className = 'stat';
+    div.innerHTML = '<div class="label">' + s.label + '</div><div class="value">' + s.value + '</div><div class="sub">' + s.sub + '</div>';
+    mainStatsEl.appendChild(div);
+  });
+
+  let explain = '현재 재고 ' + fmt(S) + 'L의 평균 원가가 ' + fmt(P,2) + '원/L이므로, ' + fmt(p) + '원/L의 사입을 더해도 기존 재고가 완충 역할을 합니다. 약 ' + fmt(solve.x) + 'L(' + fmt(tb.theoretical,2) + '대)를 추가하면 이론적으로 복합단가가 ' + fmt(T) + '원/L에 도달합니다. ' + truckSize.toLocaleString('ko-KR') + 'L 차량 기준으로는 ' + nTrucks + '대까지 목표단가 이하이며, ' + nPlus + '대 전량 입고 시 목표단가를 ' + (overNPlus? '초과합니다.' : '초과하지 않습니다.');
+  if(settings.safetyOn){
+    const safeX = solve.x * (1 - settings.safetyPct/100);
+    const safeTb = truckBreakdown(safeX, truckSize);
+    explain += ' 안전여유 ' + settings.safetyPct + '%를 적용하면 권장 사입량은 약 ' + fmt(safeX) + 'L(' + fmt(safeTb.theoretical,2) + '대)입니다.';
+  }
+  mainExplainEl.innerHTML = explain;
+}
+
+/* ===================== 차트 ===================== */
+function renderChart(){
+  const {S,P} = currentSP();
+  const p = settings.buyPrice, T = settings.targetPrice;
+  const svg = document.getElementById('chartSvg');
+  svg.innerHTML = '';
+  if(S==null||P==null||p==null||T==null){
+    svg.innerHTML = '<text x="20" y="130">데이터를 입력하면 그래프가 표시됩니다.</text>';
+    return;
+  }
+  const solve = solveMaxIntake(S,P,p,T);
+  let xMax;
+  if(solve.status==='ok' && isFinite(solve.x) && solve.x>0) xMax = solve.x * 1.6;
+  else xMax = Math.max(S*0.5, settings.truckSize*10);
+
+  const W=640,H=260,padL=64,padR=20,padT=16,padB=34;
+  const plotW = W-padL-padR, plotH = H-padT-padB;
+
+  const N=50;
+  const pts = [];
+  for(let i=0;i<=N;i++){
+    const x = xMax * i / N;
+    const y = blendPrice(S,P,x,p);
+    pts.push([x,y]);
+  }
+  const prices = pts.map(pt=>pt[1]).concat([P,T]);
+  let yMin = Math.min.apply(null, prices), yMax = Math.max.apply(null, prices);
+  const yPad = (yMax-yMin)*0.12 || 10;
+  yMin -= yPad; yMax += yPad;
+
+  function sx(x){ return padL + plotW * (x/xMax); }
+  function sy(y){ return padT + plotH * (1 - (y-yMin)/(yMax-yMin)); }
+
+  let svgHtml = '';
+  // axes
+  svgHtml += '<line x1="'+padL+'" y1="'+padT+'" x2="'+padL+'" y2="'+(H-padB)+'" stroke="#c9c2b2"/>';
+  svgHtml += '<line x1="'+padL+'" y1="'+(H-padB)+'" x2="'+(W-padR)+'" y2="'+(H-padB)+'" stroke="#c9c2b2"/>';
+  // current price line
+  svgHtml += '<line x1="'+padL+'" y1="'+sy(P)+'" x2="'+(W-padR)+'" y2="'+sy(P)+'" stroke="#a3782b" stroke-dasharray="4 3"/>';
+  svgHtml += '<text x="'+(W-padR-2)+'" y="'+(sy(P)-4)+'" text-anchor="end" fill="#a3782b">현재 '+fmt(P,2)+'원</text>';
+  // target price line
+  svgHtml += '<line x1="'+padL+'" y1="'+sy(T)+'" x2="'+(W-padR)+'" y2="'+sy(T)+'" stroke="#a4442e" stroke-dasharray="4 3"/>';
+  svgHtml += '<text x="'+(W-padR-2)+'" y="'+(sy(T)-4)+'" text-anchor="end" fill="#a4442e">목표 '+fmt(T)+'원</text>';
+  // curve
+  let d = 'M ' + pts.map(pt=>sx(pt[0])+','+sy(pt[1])).join(' L ');
+  svgHtml += '<path d="'+d+'" fill="none" stroke="#2f5d50" stroke-width="2.5"/>';
+  // marker at x
+  if(solve.status==='ok' && isFinite(solve.x)){
+    svgHtml += '<circle cx="'+sx(solve.x)+'" cy="'+sy(T)+'" r="4.5" fill="#2f5d50"/>';
+    svgHtml += '<text x="'+sx(solve.x)+'" y="'+(H-padB+18)+'" text-anchor="middle" fill="#2f5d50">'+fmt(solve.x)+'L</text>';
+  }
+  // x-axis labels
+  svgHtml += '<text x="'+padL+'" y="'+(H-padB+18)+'" text-anchor="middle">0</text>';
+  svgHtml += '<text x="'+(W-padR)+'" y="'+(H-padB+18)+'" text-anchor="middle">'+fmt(xMax)+'L</text>';
+  svgHtml += '<text x="8" y="'+padT+'" >원/L</text>';
+
+  svg.innerHTML = svgHtml;
+}
+
+/* ===================== 분할입고 시뮬레이션 ===================== */
+let splitRows = [
+  {date:'', liters:0, sale:0, price:null},
+  {date:'', liters:0, sale:0, price:null},
+];
+let splitBaseTab = activeTab; // 섹션 3의 탭과 별개로 동작. 이 드롭다운으로만 바뀜.
+
+const splitStorageSelectEl = document.getElementById('splitStorageSelect');
+function renderSplitStorageSelect(){
+  splitStorageSelectEl.innerHTML = '';
+  TAB_NAMES.forEach(name=>{
+    const opt = document.createElement('option');
+    opt.value = name;
+    const hasData = tabState[name] && tabState[name].stock!=null;
+    opt.textContent = name + (STORAGES[name] ? ' (엑셀 인식됨)' : (hasData ? ' (수동입력값 있음)' : ' (데이터 없음)'));
+    if(name === splitBaseTab) opt.selected = true;
+    splitStorageSelectEl.appendChild(opt);
+  });
+}
+splitStorageSelectEl.addEventListener('change', ()=>{
+  splitBaseTab = splitStorageSelectEl.value;
+  renderSplitSim();
+});
+
+const splitRowsEl = document.getElementById('splitRows');
+document.getElementById('addSplitRow').addEventListener('click', ()=>{
+  splitRows.push({date:'', liters:0, sale:0, price:null});
+  renderSplitRows();
+});
+
+function renderSplitRows(){
+  splitRowsEl.innerHTML = '';
+  splitRows.forEach((row, i)=>{
+    const div = document.createElement('div');
+    div.className = 'row-line';
+    div.innerHTML =
+      '<div class="field"><label>날짜</label><input type="text" data-i="'+i+'" data-k="date" value="'+row.date+'" placeholder="9/13"></div>' +
+      '<div class="field"><label>입고량(L)</label><input type="number" data-i="'+i+'" data-k="liters" value="'+row.liters+'"></div>' +
+      '<div class="field"><label>사입단가(원, 비우면 공통값)</label><input type="number" data-i="'+i+'" data-k="price" value="'+(row.price??'')+'"></div>' +
+      '<div class="field"><label>판매량(L)</label><input type="number" data-i="'+i+'" data-k="sale" value="'+row.sale+'"></div>' +
+      '<button class="rm danger-outline" data-rm="'+i+'">삭제</button>';
+    splitRowsEl.appendChild(div);
+  });
+  splitRowsEl.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const i = parseInt(e.target.dataset.i,10), k = e.target.dataset.k;
+      splitRows[i][k] = (k==='date') ? e.target.value : toNum(e.target.value);
+      renderSplitSim();
+    });
+  });
+  splitRowsEl.querySelectorAll('[data-rm]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      splitRows.splice(parseInt(e.target.dataset.rm,10),1);
+      renderSplitRows(); renderSplitSim();
+    });
+  });
+}
+
+function renderSplitSim(){
+  const base = tabState[splitBaseTab] || {stock:null, price:null};
+  const S = base.stock, P = base.price;
+  const T = settings.targetPrice, defaultPrice = settings.buyPrice;
+  const body = document.getElementById('splitResultBody');
+  const infoEl = document.getElementById('splitBaseInfo');
+  body.innerHTML = '';
+  if(S==null||P==null){
+    infoEl.innerHTML = '<strong>' + splitBaseTab + '</strong>의 재고·복합단가가 아직 입력되지 않았습니다. 섹션 3에서 해당 탭을 선택해 값을 입력하거나 엑셀을 업로드하세요.';
+    body.innerHTML = '<tr><td colspan="7">재고/현재단가를 입력하세요.</td></tr>';
+    return;
+  }
+  infoEl.innerHTML = '<strong>' + splitBaseTab + '</strong> 기준 · 시작재고 ' + fmt(S) + 'L · 시작 복합단가 ' + fmt(P,2) + '원/L 에서 아래 순서대로 반영합니다.';
+
+  let stock = S, price = P;
+  splitRows.forEach(row=>{
+    const sale = row.sale || 0;
+    stock = Math.max(0, stock - sale);
+    const liters = row.liters || 0;
+    const rowPrice = row.price!=null ? row.price : defaultPrice;
+    if(liters>0){
+      price = blendPrice(stock, price, liters, rowPrice);
+      stock += liters;
+    }
+    const diff = (T!=null) ? price - T : null;
+    const over = (T!=null) ? price > T : false;
+    const tr = document.createElement('tr');
+    if(over) tr.classList.add('over');
+    tr.innerHTML =
+      '<td>'+(row.date||'-')+'</td>' +
+      '<td>'+fmt(liters)+'</td>' +
+      '<td>'+fmt(sale)+'</td>' +
+      '<td>'+fmt(stock)+'</td>' +
+      '<td>'+fmt(price,2)+'</td>' +
+      '<td>'+(diff!=null?((diff>=0?'+':'')+fmt(diff,2)):'-')+'</td>' +
+      '<td>'+(T==null?'-':(over?'<span class="badge bad">초과</span>':'<span class="badge safe">안전</span>'))+'</td>';
+    body.appendChild(tr);
+  });
+}
+
+/* ===================== 전체 저장소 비교 ===================== */
+function renderAllCompare(){
+  const body = document.getElementById('allCompareBody');
+  body.innerHTML = '';
+  const p = settings.buyPrice, T = settings.targetPrice, truckSize = settings.truckSize;
+  TAB_NAMES.filter(n=>n!=='직접입력').forEach(name=>{
+    const ts = tabState[name];
+    const st = STORAGES[name];
+    const dateLabel = st ? st.history[ts.selectedIdx].label : (ts.stock!=null ? '수동입력' : '-');
+    const tr = document.createElement('tr');
+    if(ts.stock==null || ts.price==null){
+      tr.innerHTML = '<td>'+name+'</td><td colspan="8">데이터 없음 (엑셀 미업로드 / 직접입력 필요)</td>';
+      body.appendChild(tr);
+      return;
+    }
+    const solve = solveMaxIntake(ts.stock, ts.price, p, T);
+    let maxQ='-', trucks='-', statusHtml='-';
+    if(solve.status==='ok'){
+      const tb = truckBreakdown(solve.x, truckSize);
+      maxQ = fmt(solve.x);
+      trucks = fmt(tb.intTrucks);
+      statusHtml = '<span class="badge safe">사입여유 있음</span>';
+    } else if(solve.status==='already'){
+      statusHtml = '<span class="badge bad">이미 목표 초과</span>';
+    } else if(solve.status==='no-risk' || solve.status==='flat'){
+      statusHtml = '<span class="badge safe">초과 위험 없음</span>';
+      maxQ = '제한없음'; trucks='제한없음';
+    } else {
+      statusHtml = '<span class="badge warn">확인 필요</span>';
+    }
+    tr.innerHTML = '<td>'+name+'</td><td>'+dateLabel+'</td><td>'+fmt(ts.stock)+'</td><td>'+fmt(ts.price,2)+'</td><td>'+fmt(T)+'</td><td>'+fmt(p)+'</td><td>'+maxQ+'</td><td>'+trucks+'</td><td>'+statusHtml+'</td>';
+    body.appendChild(tr);
+  });
+}
+
+/* ===================== 전체 재계산 ===================== */
+function recalcAll(){
+  renderMain();
+  renderChart();
+  renderSplitSim();
+  renderAllCompare();
+}
+
+/* ===================== 초기화 ===================== */
+loadLocal();
+splitBaseTab = activeTab;
+bindSettingsUI();
+renderTabs();
+renderStockCard();
+renderSplitStorageSelect();
+renderSplitRows();
+renderDashboard();
+recalcAll();
+autoLoadAll();
+</script>
+</body>
+</html>
