@@ -1387,44 +1387,38 @@ $('#btnExcel').onclick = () => {
     const L = state.ledgers[s];
     const cap = state.cfg.capacity[s] || {};
     const last = L.days.at(-1).date;
-    const cols = [{ h: '일자' }, { h: '전일재고 (L)', num: 1 }, { h: '입고 (L)', num: 1 }, { h: '사입단가 (원/L)', num: 1 }, { h: '출고 (L)', num: 1 }, { h: '출고처' }, { h: '출고처 수량 (L)', num: 1 }, { h: '증감 (L)', num: 1 }, { h: '마감재고 (L)', num: 1 }, { h: '재고율', num: 1 }, { h: '복합단가 (원/L)', num: 1 }, { h: '재고금액 (원)', num: 1 }, { h: '출고원가 (원)', num: 1 }, { h: '원본 금일재고 (L)', num: 1 }, { h: '차이 (L)', num: 1 }];
-    const sh = XL.sheet([11, 13, 11, 14, 11, 16, 14, 10, 13, 8, 14, 16, 15, 15, 9]);
-    XL.titleBlock(sh, `${s}저장소 일별 원장`, `${monthLabel} · ${md(last)}(${dow(last)})까지 · 원본 ${state.parsed[s].fileName}`, cols.length);
+    // 표 하나: 구분(출고/일계) · 일자 · 유종이 모든 행에 있어 필터로 원하는 것만 볼 수 있음
+    const cols = [{ h: '구분' }, { h: '일자' }, { h: '유종' }, { h: '출고처' }, { h: '출고 (L)', num: 1 }, { h: '전일재고 (L)', num: 1 }, { h: '입고 (L)', num: 1 }, { h: '사입단가 (원/L)', num: 1 }, { h: '증감 (L)', num: 1 }, { h: '마감재고 (L)', num: 1 }, { h: '재고율', num: 1 }, { h: '복합단가 (원/L)', num: 1 }, { h: '재고금액 (원)', num: 1 }, { h: '출고원가 (원)', num: 1 }, { h: '원본 금일재고 (L)', num: 1 }, { h: '차이 (L)', num: 1 }];
+    const sh = XL.sheet([7, 11, 6, 16, 11, 13, 11, 14, 9, 13, 8, 14, 16, 15, 15, 9]);
+    XL.titleBlock(sh, `${s}저장소 일별 원장`, `${monthLabel} · ${md(last)}(${dow(last)})까지 · 원본 ${state.parsed[s].fileName} · 구분 필터: '일계'는 하루 한 줄 재고, '출고'는 거래처별 출고`, cols.length);
+    const hr = XL.header(sh, cols);
+    const SUB = 'F3F2EE';
+    const sub = (v, z, o = {}) => ({ v: v == null || !isFinite(v) ? null : v, z, s: S.td(true, { bold: true, fill: SUB, ...o }) });
+    const subT = (v, o = {}) => ({ v, s: S.td(false, { bold: true, fill: SUB, ...o }) });
     for (const f of L.active) {
-      const rs = L.rows.filter((r) => r.fuel === f);
-      XL.sectionRow(sh, FUEL_NAME[f], f, cols.length);
-      XL.header(sh, cols);
-      for (const r of rs) {
+      for (const r of L.rows.filter((x) => x.fuel === f)) {
+        const day = { v: serial(r.date), z: Z.D };
+        // 거래처별 출고 행
+        for (const [name, q] of destList(r.outflows)) {
+          sh.add([t('출고', { color: '6B6A65' }), { ...day, s: S.td(false) }, t(FUEL_NAME[f]), t(name), n(q, Z.L), n(null), n(null), n(null), n(null), n(null), n(null), n(null), n(null), n(q * (r.price || 0), Z.W), n(null), n(null)], 19);
+        }
+        // 일계 행: 그날 재고 계산 (전일재고 + 입고 − 출고 ± 증감 = 마감재고)
         const prices = r.receipts.map((x) => x.price);
-        const priceCell = !r.receipts.length ? n(null) : prices.length === 1 && prices[0] > 0 ? n(prices[0], Z.P) : t(prices.map((p) => (p > 0 ? fmt(p, 2) : '미입력')).join(' / '), { color: prices.some((p) => !(p > 0)) ? 'C62F2F' : undefined });
-        if (priceCell.s) priceCell.s.alignment = { horizontal: 'right', vertical: 'center' };
+        const priceCell = !r.receipts.length ? sub(null) : prices.length === 1 && prices[0] > 0 ? sub(prices[0], Z.P) : subT(prices.map((p) => (p > 0 ? fmt(p, 2) : '미입력')).join(' / '), { color: prices.some((p) => !(p > 0)) ? 'C62F2F' : undefined });
+        if (priceCell.s && typeof priceCell.v === 'string') priceCell.s.alignment = { horizontal: 'right', vertical: 'center' };
         const diff = r.srcBook == null ? null : r.closeQty - r.srcBook;
-        // 거래처 한 명당 한 행: 하루치 값은 첫 행에만, 일자는 모든 행에 (필터용)
-        const ds = destList(r.outflows);
-        const [d0, ...rest] = ds.length ? ds : [[null, null]];
-        sh.add([dd(r.date), n(r.openQty, Z.L), n(r.inQty || null, Z.L), priceCell, n(r.outQty || null, Z.L), nm(d0[0]), n(d0[1], Z.L), n(r.adj || null, '+#,##0;-#,##0'), n(r.closeQty, Z.L, { bold: true }), n(cap[f] ? r.closeQty / cap[f] : null, Z.R), n(r.price, Z.P, { bold: true }), n(r.closeAmt, Z.W), n(r.outAmt || null, Z.W), n(r.srcBook, Z.L, { color: '6B6A65' }), n(diff, '+#,##0;-#,##0;0', Math.abs(diff || 0) > 0.5 ? { color: 'C62F2F', bold: true } : { color: '6B6A65' })], 19);
-        for (const [name, q] of rest) sh.add([dd(r.date, { color: '9C9A93' }), n(null), n(null), n(null), n(null), nm(name), n(q, Z.L), n(null), n(null), n(null), n(null), n(null), n(null), n(null), n(null)], 19);
+        sh.add([subT('일계'), { ...day, s: S.td(false, { bold: true, fill: SUB }) }, subT(FUEL_NAME[f]), subT(null), sub(r.outQty || null, Z.L), sub(r.openQty, Z.L), sub(r.inQty || null, Z.L), priceCell, sub(r.adj || null, '+#,##0;-#,##0'), sub(r.closeQty, Z.L), sub(cap[f] ? r.closeQty / cap[f] : null, Z.R), sub(r.price, Z.P), sub(r.closeAmt, Z.W), sub(r.outAmt || null, Z.W), sub(r.srcBook, Z.L, { color: '6B6A65' }), sub(diff, '+#,##0;-#,##0;0', Math.abs(diff || 0) > 0.5 ? { color: 'C62F2F' } : { color: '6B6A65' })], 20);
       }
-      const lr = rs.at(-1);
-      sh.add([{ v: '합계', s: S.total(false) }, { v: '', s: S.total(true) }, { v: sumBy(rs, (x) => x.inQty), z: Z.L, s: S.total(true) }, { v: '', s: S.total(true) }, { v: sumBy(rs, (x) => x.outQty), z: Z.L, s: S.total(true) }, { v: '', s: S.total(false) }, { v: sumBy(rs, (x) => x.outQty), z: Z.L, s: S.total(true) }, { v: sumBy(rs, (x) => x.adj) || null, z: '+#,##0;-#,##0', s: S.total(true) }, { v: lr?.closeQty, z: Z.L, s: S.total(true) }, { v: cap[f] && lr ? lr.closeQty / cap[f] : null, z: Z.R, s: S.total(true) }, { v: lr?.price, z: Z.P, s: S.total(true) }, { v: lr?.closeAmt, z: Z.W, s: S.total(true) }, { v: sumBy(rs, (x) => x.outAmt), z: Z.W, s: S.total(true) }, { v: '', s: S.total(true) }, { v: '', s: S.total(true) }], 21);
-      sh.blank(14);
     }
-    // 거래처별 합계
-    const by = {};
-    for (const r of L.rows) for (const o of r.outflows) {
-      const k = o.name || '(거래처명 없음)';
-      by[k] ??= { q: {}, amt: 0, days: new Set() };
-      by[k].q[r.fuel] = (by[k].q[r.fuel] || 0) + o.qty; by[k].amt += o.qty * (r.price || 0); by[k].days.add(r.date);
+    sh.filter = XLSX.utils.encode_range({ s: { r: hr, c: 0 }, e: { r: Math.max(sh.rows.length - 1, hr), c: cols.length - 1 } });
+    // 월 합계 (필터 범위 밖)
+    for (const f of L.active) {
+      const rs = L.rows.filter((x) => x.fuel === f); const lr = rs.at(-1);
+      sh.add([{ v: '월 합계', s: S.total(false) }, { v: '', s: S.total() }, { v: FUEL_NAME[f], s: S.total(false) }, { v: '', s: S.total() }, { v: sumBy(rs, (x) => x.outQty), z: Z.L, s: S.total(true) }, { v: rs[0]?.openQty, z: Z.L, s: S.total(true) }, { v: sumBy(rs, (x) => x.inQty), z: Z.L, s: S.total(true) }, { v: '', s: S.total(true) }, { v: sumBy(rs, (x) => x.adj) || null, z: '+#,##0;-#,##0', s: S.total(true) }, { v: lr?.closeQty, z: Z.L, s: S.total(true) }, { v: cap[f] && lr ? lr.closeQty / cap[f] : null, z: Z.R, s: S.total(true) }, { v: lr?.price, z: Z.P, s: S.total(true) }, { v: lr?.closeAmt, z: Z.W, s: S.total(true) }, { v: sumBy(rs, (x) => x.outAmt), z: Z.W, s: S.total(true) }, { v: '', s: S.total(true) }, { v: '', s: S.total(true) }], 21);
     }
-    const fuels = L.active;
-    const cc = [{ h: '거래처' }, ...fuels.map((f) => ({ h: `${FUEL_NAME[f]} (L)`, num: 1 })), { h: '합계 (L)', num: 1 }, { h: '출고원가 (원)', num: 1 }, { h: '출고일수 (일)', num: 1 }];
-    XL.sectionRow(sh, '거래처별 출고 합계', null, cc.length);
-    XL.header(sh, cc);
-    const list = Object.entries(by).sort((a, b) => sumBy(fuels, (f) => b[1].q[f]) - sumBy(fuels, (f) => a[1].q[f]));
-    for (const [name, x] of list) sh.add([t(name, { bold: true }), ...fuels.map((f) => n(x.q[f] || null, Z.L)), n(sumBy(fuels, (f) => x.q[f]), Z.L, { bold: true }), n(x.amt, Z.W), n(x.days.size, Z.N)], 19);
-    sh.add([{ v: '합계', s: S.total(false) }, ...fuels.map((f) => ({ v: sumBy(list, ([, x]) => x.q[f]), z: Z.L, s: S.total(true) })), { v: sumBy(list, ([, x]) => sumBy(fuels, (f) => x.q[f])), z: Z.L, s: S.total(true) }, { v: sumBy(list, ([, x]) => x.amt), z: Z.W, s: S.total(true) }, { v: '', s: S.total(true) }], 21);
+    sh.blank(14);
     XLSX.utils.book_append_sheet(wb, sh.build(), s);
-    views.push({});
+    views.push({ freeze: hr + 1 });
   }
 
   // 3) 출고내역: 모든 저장소, 거래처 한 명당 한 행 (필터용)
@@ -1447,7 +1441,35 @@ $('#btnExcel').onclick = () => {
     views.push({ freeze: hr + 1 });
   }
 
-  // 4) 입고내역
+  // 4) 거래처별 합계: 저장소·거래처 한 행씩 (필터용)
+  {
+    const fuelsAll = FUELS.filter((f) => sites.some((st) => state.ledgers[st].active.includes(f)));
+    const cols = [{ h: '저장소' }, { h: '거래처' }, ...fuelsAll.map((f) => ({ h: `${FUEL_NAME[f]} (L)`, num: 1 })), { h: '합계 (L)', num: 1 }, { h: '출고원가 (원)', num: 1 }, { h: '출고일수 (일)', num: 1 }];
+    const sh = XL.sheet([10, 16, ...fuelsAll.map(() => 12), 13, 16, 12]);
+    XL.titleBlock(sh, '거래처별 출고 합계', `${monthLabel} · 저장소별로 거래처 출고량이 많은 순`, cols.length);
+    const hr = XL.header(sh, cols);
+    const grand = { q: {}, amt: 0 };
+    for (const st of sites) {
+      const L = state.ledgers[st];
+      const by = {};
+      for (const r of L.rows) for (const o of r.outflows) {
+        const k = o.name || '(거래처명 없음)';
+        by[k] ??= { q: {}, amt: 0, days: new Set() };
+        by[k].q[r.fuel] = (by[k].q[r.fuel] || 0) + o.qty; by[k].amt += o.qty * (r.price || 0); by[k].days.add(r.date);
+      }
+      const list = Object.entries(by).sort((a, b) => sumBy(fuelsAll, (f) => b[1].q[f]) - sumBy(fuelsAll, (f) => a[1].q[f]));
+      for (const [name, x] of list) {
+        sh.add([t(st, { bold: true }), t(name, { bold: true }), ...fuelsAll.map((f) => n(x.q[f] || null, Z.L)), n(sumBy(fuelsAll, (f) => x.q[f]), Z.L, { bold: true }), n(x.amt, Z.W), n(x.days.size, Z.N)], 19);
+        fuelsAll.forEach((f) => (grand.q[f] = (grand.q[f] || 0) + (x.q[f] || 0))); grand.amt += x.amt;
+      }
+    }
+    sh.filter = XLSX.utils.encode_range({ s: { r: hr, c: 0 }, e: { r: Math.max(sh.rows.length - 1, hr), c: cols.length - 1 } });
+    sh.add([{ v: '합계', s: S.total(false) }, { v: '', s: S.total() }, ...fuelsAll.map((f) => ({ v: grand.q[f] || 0, z: Z.L, s: S.total(true) })), { v: sumBy(fuelsAll, (f) => grand.q[f]), z: Z.L, s: S.total(true) }, { v: grand.amt, z: Z.W, s: S.total(true) }, { v: '', s: S.total(true) }], 21);
+    XLSX.utils.book_append_sheet(wb, sh.build(), '거래처별');
+    views.push({ freeze: hr + 1 });
+  }
+
+  // 5) 입고내역
   {
     const cols = [{ h: '저장소' }, { h: '일자' }, { h: '유종' }, { h: '구분' }, { h: '수량 (L)', num: 1 }, { h: '사입단가 (원/L)', num: 1 }, { h: '매입금액 (원)', num: 1 }];
     const sh = XL.sheet([10, 11, 7, 8, 12, 15, 17]);
