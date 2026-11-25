@@ -1346,8 +1346,8 @@ $('#btnExcel').onclick = () => {
   const sumBy = (arr, fn) => arr.reduce((a, x) => a + (fn(x) || 0), 0);
   const n = (v, z, o) => ({ v: v == null || !isFinite(v) ? null : v, z, s: S.td(true, o) });
   const t = (v, o) => ({ v, s: S.td(false, o) });
+  const nm = (v) => { const c = t(v); c.s.alignment = { horizontal: 'left', vertical: 'center', indent: 1 }; return c; };
   const dd = (iso, o) => t(`${md(iso)}(${dow(iso)})`, o);
-  const dest = (outflows) => { const c = t(destList(outflows).map(([k, q]) => `${k} ${fmt(q)}`).join('\n') || null, { color: '3D3C38' }); c.s.alignment = { horizontal: 'left', vertical: 'center', wrapText: true, indent: 1 }; return c; };
 
   // 1) 대시보드
   {
@@ -1387,8 +1387,8 @@ $('#btnExcel').onclick = () => {
     const L = state.ledgers[s];
     const cap = state.cfg.capacity[s] || {};
     const last = L.days.at(-1).date;
-    const cols = [{ h: '일자' }, { h: '전일재고 (L)', num: 1 }, { h: '입고 (L)', num: 1 }, { h: '사입단가 (원/L)', num: 1 }, { h: '출고 (L)', num: 1 }, { h: '출고처 (L)' }, { h: '증감 (L)', num: 1 }, { h: '마감재고 (L)', num: 1 }, { h: '재고율', num: 1 }, { h: '복합단가 (원/L)', num: 1 }, { h: '재고금액 (원)', num: 1 }, { h: '출고원가 (원)', num: 1 }, { h: '원본 금일재고 (L)', num: 1 }, { h: '차이 (L)', num: 1 }];
-    const sh = XL.sheet([11, 13, 11, 14, 11, 34, 10, 13, 8, 14, 16, 15, 15, 9]);
+    const cols = [{ h: '일자' }, { h: '전일재고 (L)', num: 1 }, { h: '입고 (L)', num: 1 }, { h: '사입단가 (원/L)', num: 1 }, { h: '출고 (L)', num: 1 }, { h: '출고처' }, { h: '출고처 수량 (L)', num: 1 }, { h: '증감 (L)', num: 1 }, { h: '마감재고 (L)', num: 1 }, { h: '재고율', num: 1 }, { h: '복합단가 (원/L)', num: 1 }, { h: '재고금액 (원)', num: 1 }, { h: '출고원가 (원)', num: 1 }, { h: '원본 금일재고 (L)', num: 1 }, { h: '차이 (L)', num: 1 }];
+    const sh = XL.sheet([11, 13, 11, 14, 11, 16, 14, 10, 13, 8, 14, 16, 15, 15, 9]);
     XL.titleBlock(sh, `${s}저장소 일별 원장`, `${monthLabel} · ${md(last)}(${dow(last)})까지 · 원본 ${state.parsed[s].fileName}`, cols.length);
     for (const f of L.active) {
       const rs = L.rows.filter((r) => r.fuel === f);
@@ -1399,10 +1399,14 @@ $('#btnExcel').onclick = () => {
         const priceCell = !r.receipts.length ? n(null) : prices.length === 1 && prices[0] > 0 ? n(prices[0], Z.P) : t(prices.map((p) => (p > 0 ? fmt(p, 2) : '미입력')).join(' / '), { color: prices.some((p) => !(p > 0)) ? 'C62F2F' : undefined });
         if (priceCell.s) priceCell.s.alignment = { horizontal: 'right', vertical: 'center' };
         const diff = r.srcBook == null ? null : r.closeQty - r.srcBook;
-        sh.add([dd(r.date), n(r.openQty, Z.L), n(r.inQty || null, Z.L), priceCell, n(r.outQty || null, Z.L), dest(r.outflows), n(r.adj || null, '+#,##0;-#,##0'), n(r.closeQty, Z.L, { bold: true }), n(cap[f] ? r.closeQty / cap[f] : null, Z.R), n(r.price, Z.P, { bold: true }), n(r.closeAmt, Z.W), n(r.outAmt || null, Z.W), n(r.srcBook, Z.L, { color: '6B6A65' }), n(diff, '+#,##0;-#,##0;0', Math.abs(diff || 0) > 0.5 ? { color: 'C62F2F', bold: true } : { color: '6B6A65' })], Math.max(19, destList(r.outflows).length * 14 + 6));
+        // 거래처 한 명당 한 행: 하루치 값은 첫 행에만, 일자는 모든 행에 (필터용)
+        const ds = destList(r.outflows);
+        const [d0, ...rest] = ds.length ? ds : [[null, null]];
+        sh.add([dd(r.date), n(r.openQty, Z.L), n(r.inQty || null, Z.L), priceCell, n(r.outQty || null, Z.L), nm(d0[0]), n(d0[1], Z.L), n(r.adj || null, '+#,##0;-#,##0'), n(r.closeQty, Z.L, { bold: true }), n(cap[f] ? r.closeQty / cap[f] : null, Z.R), n(r.price, Z.P, { bold: true }), n(r.closeAmt, Z.W), n(r.outAmt || null, Z.W), n(r.srcBook, Z.L, { color: '6B6A65' }), n(diff, '+#,##0;-#,##0;0', Math.abs(diff || 0) > 0.5 ? { color: 'C62F2F', bold: true } : { color: '6B6A65' })], 19);
+        for (const [name, q] of rest) sh.add([dd(r.date, { color: '9C9A93' }), n(null), n(null), n(null), n(null), nm(name), n(q, Z.L), n(null), n(null), n(null), n(null), n(null), n(null), n(null), n(null)], 19);
       }
       const lr = rs.at(-1);
-      sh.add([{ v: '합계', s: S.total(false) }, { v: '', s: S.total(true) }, { v: sumBy(rs, (x) => x.inQty), z: Z.L, s: S.total(true) }, { v: '', s: S.total(true) }, { v: sumBy(rs, (x) => x.outQty), z: Z.L, s: S.total(true) }, { v: '', s: S.total(false) }, { v: sumBy(rs, (x) => x.adj) || null, z: '+#,##0;-#,##0', s: S.total(true) }, { v: lr?.closeQty, z: Z.L, s: S.total(true) }, { v: cap[f] && lr ? lr.closeQty / cap[f] : null, z: Z.R, s: S.total(true) }, { v: lr?.price, z: Z.P, s: S.total(true) }, { v: lr?.closeAmt, z: Z.W, s: S.total(true) }, { v: sumBy(rs, (x) => x.outAmt), z: Z.W, s: S.total(true) }, { v: '', s: S.total(true) }, { v: '', s: S.total(true) }], 21);
+      sh.add([{ v: '합계', s: S.total(false) }, { v: '', s: S.total(true) }, { v: sumBy(rs, (x) => x.inQty), z: Z.L, s: S.total(true) }, { v: '', s: S.total(true) }, { v: sumBy(rs, (x) => x.outQty), z: Z.L, s: S.total(true) }, { v: '', s: S.total(false) }, { v: sumBy(rs, (x) => x.outQty), z: Z.L, s: S.total(true) }, { v: sumBy(rs, (x) => x.adj) || null, z: '+#,##0;-#,##0', s: S.total(true) }, { v: lr?.closeQty, z: Z.L, s: S.total(true) }, { v: cap[f] && lr ? lr.closeQty / cap[f] : null, z: Z.R, s: S.total(true) }, { v: lr?.price, z: Z.P, s: S.total(true) }, { v: lr?.closeAmt, z: Z.W, s: S.total(true) }, { v: sumBy(rs, (x) => x.outAmt), z: Z.W, s: S.total(true) }, { v: '', s: S.total(true) }, { v: '', s: S.total(true) }], 21);
       sh.blank(14);
     }
     // 거래처별 합계
@@ -1419,20 +1423,31 @@ $('#btnExcel').onclick = () => {
     const list = Object.entries(by).sort((a, b) => sumBy(fuels, (f) => b[1].q[f]) - sumBy(fuels, (f) => a[1].q[f]));
     for (const [name, x] of list) sh.add([t(name, { bold: true }), ...fuels.map((f) => n(x.q[f] || null, Z.L)), n(sumBy(fuels, (f) => x.q[f]), Z.L, { bold: true }), n(x.amt, Z.W), n(x.days.size, Z.N)], 19);
     sh.add([{ v: '합계', s: S.total(false) }, ...fuels.map((f) => ({ v: sumBy(list, ([, x]) => x.q[f]), z: Z.L, s: S.total(true) })), { v: sumBy(list, ([, x]) => sumBy(fuels, (f) => x.q[f])), z: Z.L, s: S.total(true) }, { v: sumBy(list, ([, x]) => x.amt), z: Z.W, s: S.total(true) }, { v: '', s: S.total(true) }], 21);
-    sh.blank(14);
-    // 출고 상세
-    XL.sectionRow(sh, '출고 상세', null, 7);
-    XL.header(sh, [{ h: '일자' }, { h: '유종' }, { h: '거래처' }, { h: '수량 (L)', num: 1 }, { h: '복합단가 (원/L)', num: 1 }, { h: '출고원가 (원)', num: 1 }, { h: '원본 위치' }]);
-    let prev = null;
-    for (const r of L.rows) for (const o of r.outflows) {
-      sh.add([r.date === prev ? t(null) : dd(r.date), t(FUEL_NAME[r.fuel]), t(o.name, { bold: true }), n(o.qty, Z.L), n(r.price, Z.P), n(o.qty * (r.price || 0), Z.W), t(`${L.days.find((d) => d.date === r.date)?.sheetName}!${o.cell}`, { color: '6B6A65' })], 18);
-      prev = r.date;
-    }
     XLSX.utils.book_append_sheet(wb, sh.build(), s);
     views.push({});
   }
 
-  // 3) 입고내역
+  // 3) 출고내역: 모든 저장소, 거래처 한 명당 한 행 (필터용)
+  {
+    const cols = [{ h: '저장소' }, { h: '일자' }, { h: '유종' }, { h: '거래처' }, { h: '수량 (L)', num: 1 }, { h: '복합단가 (원/L)', num: 1 }, { h: '출고원가 (원)', num: 1 }, { h: '원본 표기' }, { h: '원본 위치' }];
+    const sh = XL.sheet([10, 11, 7, 16, 12, 15, 16, 16, 12]);
+    XL.titleBlock(sh, '출고 내역', `${monthLabel} · 저장소 4곳 출고를 거래처 한 명당 한 행으로 모은 표 · 머리글에서 필터 사용`, cols.length);
+    const hr = XL.header(sh, cols);
+    let tq = 0, ta = 0;
+    for (const s of sites) {
+      const L = state.ledgers[s];
+      for (const r of L.rows) for (const o of r.outflows) {
+        const amt = o.qty * (r.price || 0); tq += o.qty; ta += amt;
+        sh.add([t(s, { bold: true }), { v: serial(r.date), z: Z.D, s: S.td(false) }, t(FUEL_NAME[r.fuel]), t(o.name, { bold: true }), n(o.qty, Z.L), n(r.price, Z.P), n(amt, Z.W), t(o.rawName !== o.name ? o.rawName : null, { color: '6B6A65' }), t(`${L.days.find((d) => d.date === r.date)?.sheetName}!${o.cell}`, { color: '6B6A65' })], 19);
+      }
+    }
+    sh.filter = XLSX.utils.encode_range({ s: { r: hr, c: 0 }, e: { r: Math.max(sh.rows.length - 1, hr), c: cols.length - 1 } });
+    sh.add([{ v: '합계', s: S.total(false) }, { v: '', s: S.total() }, { v: '', s: S.total() }, { v: '', s: S.total() }, { v: tq, z: Z.L, s: S.total(true) }, { v: '', s: S.total(true) }, { v: ta, z: Z.W, s: S.total(true) }, { v: '', s: S.total() }, { v: '', s: S.total() }], 21);
+    XLSX.utils.book_append_sheet(wb, sh.build(), '출고내역');
+    views.push({ freeze: hr + 1 });
+  }
+
+  // 4) 입고내역
   {
     const cols = [{ h: '저장소' }, { h: '일자' }, { h: '유종' }, { h: '구분' }, { h: '수량 (L)', num: 1 }, { h: '사입단가 (원/L)', num: 1 }, { h: '매입금액 (원)', num: 1 }];
     const sh = XL.sheet([10, 11, 7, 8, 12, 15, 17]);
