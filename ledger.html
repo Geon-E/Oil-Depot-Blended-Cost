@@ -165,6 +165,13 @@ table.ledger thead .stick { z-index: 3; background: var(--surface-2); }
 table.ledger tbody tr:nth-child(even) td.stick { background: var(--zebra); }
 table.ledger tfoot .stick { background: var(--surface-2); }
 table.ledger td.date { font-weight: 600; color: var(--text); }
+.viewtog { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 8px; overflow: hidden; margin: 4px 0 10px; }
+.viewtog button { border: 0; border-radius: 0; padding: 6px 12px; font-weight: 600; background: var(--surface); color: var(--text-2); }
+.viewtog button + button { border-left: 1px solid var(--line-strong); }
+.viewtog button[aria-pressed="true"] { background: var(--accent-soft); color: var(--text); }
+table.ledger td small, table.ledger th small { display: block; font-size: 11.5px; font-weight: 500; color: var(--text-3); line-height: 1.4; }
+table.ledger th.fuelgrp { color: var(--text); font-size: 13px; font-weight: 700; }
+table.ledger.side td.dest { width: 130px; min-width: 120px; max-width: 150px; }
 .fuel-h { display: flex; align-items: center; gap: 8px; margin: 22px 0 10px; font-size: 16px; font-weight: 700; }
 tr.daybreak td { border-top: 1px solid var(--line-strong); }
 td.muted { color: var(--text-3); }
@@ -857,10 +864,48 @@ function siteHTML(site) {
   const chips = [['ledger', '일별 원장'], ['in', `입고·사입단가${c.crit ? ` <span class="badge crit">${c.crit}</span>` : ''}`], ['out', '거래처별 출고']]
     .map(([k, l]) => `<button data-sub="${k}" aria-pressed="${sub === k}">${l}</button>`).join('');
   let body = '';
-  if (sub === 'ledger') body = ledgerHTML(site, L);
+  if (sub === 'ledger') body = (state.ledgerView || 'side') === 'side' ? ledgerSideHTML(site, L) : ledgerHTML(site, L);
   else if (sub === 'in') body = entriesHTML(site, L);
   else body = outflowHTML(site, L);
   return `<section class="panel"><h2>${site}저장소</h2><p class="sub">${esc(state.parsed[site].fileName)}</p>${openingBox(site, L)}<div class="chips">${chips}</div>${body}</section>`;
+}
+
+function viewToggle() {
+  const v = state.ledgerView || 'side';
+  return `<div class="viewtog" role="group" aria-label="원장 보기 방식"><button data-view="side" aria-pressed="${v === 'side'}">유종 양옆으로</button><button data-view="detail" aria-pressed="${v === 'detail'}">유종별 자세히</button></div>`;
+}
+
+// 날짜 한 줄에 등유·경유를 양옆으로 (핵심 열만, 보조 값은 작은 글씨로 같은 칸에)
+function ledgerSideHTML(site, L) {
+  const fuels = L.active;
+  const cap = state.cfg.capacity[site] || {};
+  const issuesBy = {};
+  L.issues.forEach((i) => ((issuesBy[`${i.date}|${i.fuel}`] ??= []).push(i)));
+  const PER = 6;
+  const head1 = fuels.map((f) => `<th colspan="${PER}" class="gs fuelgrp"><span class="inline"><span class="dot" style="background:${FUEL_VAR[f]}"></span>${FUEL_NAME[f]}</span></th>`).join('');
+  const head2 = fuels.map(() => `<th class="n gs">입고 (L)<small>사입단가</small></th><th class="n">출고 (L)</th><th>출고처 (L)</th><th class="n key">마감재고 (L)<small>재고율 · 증감</small></th><th class="n key">복합단가 (원/L)</th><th>검증</th>`).join('');
+  const body = L.days.map((d) => {
+    const cells = fuels.map((f) => {
+      const r = L.rows.find((x) => x.date === d.date && x.fuel === f);
+      if (!r) return `<td class="gs"></td><td></td><td></td><td class="key"></td><td class="key"></td><td></td>`;
+      const iss = issuesBy[`${d.date}|${f}`] || [];
+      const recP = r.receipts.map((x) => (x.price ? '@' + fmt(x.price, 2) : '<span class="badge crit">단가 미입력</span>')).join('<br>');
+      const sub = [cap[f] ? fmt(pct(r.closeQty, cap[f]), 1) + '%' : '', r.adj ? '증감 ' + signed(r.adj) : ''].filter(Boolean).join(' · ');
+      const chk = iss.length ? iss.map((i) => `<span class="badge ${i.type === 'book' ? 'warn' : 'crit'}" title="${esc(i.msg)}">${i.type === 'book' ? '!' : '⚠'}</span>`).join(' ') : '<span class="badge ok" title="원본 금일재고와 일치">✓</span>';
+      return `<td class="n gs">${r.inQty ? fmt(r.inQty) : ''}${recP ? `<small>${recP}</small>` : ''}</td><td class="n">${r.outQty ? fmt(r.outQty) : ''}</td><td class="dest">${destHTML(r.outflows)}</td><td class="n key"><b>${fmt(r.closeQty)}</b>${sub ? `<small>${sub}</small>` : ''}</td><td class="n key"><b>${fmtP(r.price)}</b></td><td>${chk}</td>`;
+    }).join('');
+    return `<tr><td class="stick date">${md(d.date)}(${dow(d.date)})</td>${cells}</tr>`;
+  }).join('');
+  const foot = fuels.map((f) => {
+    const rs = L.rows.filter((x) => x.fuel === f); const lr = rs.at(-1);
+    return `<td class="n gs">${fmt(rs.reduce((a, x) => a + x.inQty, 0))}</td><td class="n">${fmt(rs.reduce((a, x) => a + x.outQty, 0))}</td><td></td><td class="n key">${fmt(lr?.closeQty)}</td><td class="n key">${fmtP(lr?.price)}</td><td></td>`;
+  }).join('');
+  return `${viewToggle()}<p class="hint">같은 날짜의 ${fuels.map((f) => FUEL_NAME[f]).join('·')}를 한 줄에 나란히 보여줍니다. 재고금액·출고원가·원본 금일재고는 '유종별 자세히'에서 볼 수 있습니다.</p>
+    <div class="tablewrap"><table class="ledger side">
+      <thead><tr class="grp"><th rowspan="2" class="stick">일자</th>${head1}</tr><tr>${head2}</tr></thead>
+      <tbody>${body}</tbody>
+      <tfoot><tr><td class="stick">합계</td>${foot}</tr></tfoot>
+    </table></div>`;
 }
 
 function ledgerHTML(site, L) {
@@ -891,7 +936,7 @@ function ledgerHTML(site, L) {
       <tfoot><tr><td class="stick">합계</td><td class="gs"></td><td class="n">${fmt(tot.in)}</td><td></td><td class="n">${fmt(tot.out)}</td><td></td><td class="n">${tot.adj ? signed(tot.adj) : ''}</td><td class="n gs key">${fmt(rows.at(-1)?.closeQty)}</td><td></td><td class="n key">${fmtP(rows.at(-1)?.price)}</td><td class="n">${fmt(rows.at(-1)?.closeAmt)}</td><td class="n gs">${fmt(tot.outAmt)}</td><td class="gs"></td><td></td></tr></tfoot>
     </table></div>`;
   }
-  return `<p class="hint">계산 순서(기존 엑셀과 동일): 그날 입고분을 먼저 가중평균으로 섞어 복합단가를 새로 내고 → 출고는 그 단가로 차감 → 증감은 수량에만 반영합니다. 출고원가 = 출고량 × 그날 복합단가.</p>${html}`;
+  return `${viewToggle()}<p class="hint">계산 순서(기존 엑셀과 동일): 그날 입고분을 먼저 가중평균으로 섞어 복합단가를 새로 내고 → 출고는 그 단가로 차감 → 증감은 수량에만 반영합니다. 출고원가 = 출고량 × 그날 복합단가.</p>${html}`;
 }
 
 function entriesHTML(site, L) {
@@ -1086,6 +1131,7 @@ function bindMain() {
     c.onclick = go; c.onkeydown = (e) => { if (e.key === 'Enter') go(); };
   });
   m.querySelectorAll('[data-sub]').forEach((b) => (b.onclick = () => { state.sub[state.tab] = b.dataset.sub; render(); }));
+  m.querySelectorAll('[data-view]').forEach((b) => (b.onclick = () => { state.ledgerView = b.dataset.view; try { localStorage.setItem('storeLedger.view', b.dataset.view); } catch {} render(); }));
   // 입고 입력
   m.querySelectorAll('[data-e]').forEach((inp) => {
     inp.onchange = () => {
@@ -1494,6 +1540,7 @@ $('#btnExcel').onclick = () => {
 
 // 이전에 입력한 설정 복원 후 첫 화면
 state.tab = tabFromHash() || state.tab;
+try { state.ledgerView = localStorage.getItem('storeLedger.view') || 'side'; } catch { state.ledgerView = 'side'; }
 loadParsed();
 pickStateMonth();
 if (state.month) { for (const site of Object.keys(state.parsed)) syncEntries(site); recompute(); }
