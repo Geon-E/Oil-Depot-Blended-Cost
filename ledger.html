@@ -467,6 +467,20 @@ const state = {
   ledgers: {},
 };
 
+// 사이트 기본 설정(기초값·사입단가). 버전이 바뀌면 한 번만 브라우저 설정에 덮어씀
+const SITE_DEFAULTS = {"version":"2026-11-v2","months":{"2026-11":{"안동북부":{"opening":{"G":{"qty":0,"price":null},"K":{"qty":0,"price":null},"D":{"qty":0,"price":null}},"entries":[{"id":"nrt7pkd","date":"2026-11-02","fuel":"K","qty":24000,"price":1380,"type":"buy","auto":false},{"id":"ygk8qlq","date":"2026-11-02","fuel":"D","qty":8000,"price":1773,"type":"buy","auto":false},{"id":"iyri9h2","date":"2026-11-05","fuel":"K","qty":24000,"price":1380,"type":"buy","auto":false},{"id":"g90sn6y","date":"2026-11-05","fuel":"D","qty":8028,"price":1773,"type":"buy","auto":false},{"id":"nlahxgl","date":"2026-11-10","fuel":"K","qty":32000,"price":1380,"type":"buy","auto":false},{"id":"p6og3cx","date":"2026-11-12","fuel":"K","qty":32000,"price":1380,"type":"buy","auto":false},{"id":"j9mo7wz","date":"2026-11-17","fuel":"K","qty":24000,"price":1380,"type":"buy","auto":false},{"id":"yccknge","date":"2026-11-17","fuel":"D","qty":7998,"price":1773,"type":"buy","auto":false},{"id":"rycqhct","date":"2026-11-19","fuel":"K","qty":24000,"price":1380,"type":"buy","auto":false},{"id":"l7mv2yk","date":"2026-11-19","fuel":"D","qty":8000,"price":1773,"type":"buy","auto":false}]},"단지":{"opening":{"G":{"qty":0,"price":null},"K":{"qty":55563,"price":1320.38,"priceSrc":"직접 입력"},"D":{"qty":192385,"price":1691.11,"priceSrc":"직접 입력"}},"entries":[{"id":"5piyakn","date":"2026-11-04","fuel":"K","qty":32000,"price":1380,"type":"buy","auto":false},{"id":"ul3dqef","date":"2026-11-12","fuel":"K","qty":155,"price":null,"type":"adj","auto":false},{"id":"1c3btmi","date":"2026-11-12","fuel":"D","qty":1530,"price":1773,"type":"buy","auto":false},{"id":"clu866u","date":"2026-11-15","fuel":"K","qty":32000,"price":1380,"type":"buy","auto":false},{"id":"fvlcaxw","date":"2026-11-15","fuel":"D","qty":32000,"price":1773,"type":"buy","auto":false},{"id":"x9gl440","date":"2026-11-20","fuel":"K","qty":32000,"price":1380,"type":"buy","auto":false},{"id":"fo57dpo","date":"2026-11-20","fuel":"D","qty":32000,"price":1773,"type":"buy","auto":false}]},"침산":{"opening":{"G":{"qty":0,"price":null},"K":{"qty":0,"price":null},"D":{"qty":275068,"price":1676.1,"priceSrc":"직접 입력"}},"entries":[{"id":"r77u5xe","date":"2026-11-03","fuel":"D","qty":15979,"price":1773,"type":"buy","auto":false},{"id":"13dvugo","date":"2026-11-04","fuel":"D","qty":19992,"price":1773,"type":"buy","auto":false},{"id":"bu17jne","date":"2026-11-09","fuel":"D","qty":16006,"price":1773,"type":"buy","auto":false},{"id":"o7fukj5","date":"2026-11-18","fuel":"D","qty":30000,"price":1773,"type":"buy","auto":false}]},"신도시":{"opening":{"G":{"qty":0,"price":null},"K":{"qty":59620,"price":1303.6,"priceSrc":"직접 입력"},"D":{"qty":205524,"price":1676.11,"priceSrc":"직접 입력"}},"entries":[{"id":"cet2ts0","date":"2026-11-01","fuel":"D","qty":32000,"price":1773,"type":"buy","auto":false},{"id":"fk9y45s","date":"2026-11-10","fuel":"K","qty":4000,"price":1380,"type":"buy","auto":false},{"id":"mtpiy5l","date":"2026-11-10","fuel":"D","qty":20000,"price":1773,"type":"buy","auto":false},{"id":"x4ucsoh","date":"2026-11-14","fuel":"D","qty":32000,"price":1773,"type":"buy","auto":false},{"id":"vhs55jt","date":"2026-11-17","fuel":"D","qty":62000,"price":1773,"type":"buy","auto":false},{"id":"sd4ampp","date":"2026-11-19","fuel":"D","qty":30000,"price":1773,"type":"buy","auto":false}]}}},"nameMap":{},"capacity":{"단지":{"G":0,"K":200000,"D":500000},"신도시":{"G":0,"K":200000,"D":500000},"안동북부":{"G":0,"K":300000,"D":100000},"침산":{"G":0,"K":0,"D":750000}}};
+(function applySiteDefaults() {
+  if (!SITE_DEFAULTS || state.cfg.defaultsVersion === SITE_DEFAULTS.version) return;
+  for (const [m, sites] of Object.entries(SITE_DEFAULTS.months || {})) {
+    state.cfg.months[m] ??= {};
+    for (const [s, v] of Object.entries(sites)) state.cfg.months[m][s] = JSON.parse(JSON.stringify(v));
+  }
+  Object.assign(state.cfg.nameMap, SITE_DEFAULTS.nameMap || {});
+  for (const [s, c] of Object.entries(SITE_DEFAULTS.capacity || {})) state.cfg.capacity[s] = { ...state.cfg.capacity[s], ...c };
+  state.cfg.defaultsVersion = SITE_DEFAULTS.version;
+  saveLocal();
+})();
+
 function monthCfg(site) {
   const m = state.month;
   state.cfg.months[m] ??= {};
@@ -910,6 +924,24 @@ function bindMain() {
       e[k] = k === 'type' ? inp.value : (inp.value === '' ? null : +inp.value);
       e.auto = false;
       commit(k === 'type');
+    };
+  });
+  // 사입단가 칸: Tab/Enter → 다음 줄 사입단가, Shift+Tab → 이전 줄
+  m.querySelectorAll('input[data-k="price"]').forEach((inp) => {
+    inp.onkeydown = (ev) => {
+      if (ev.key !== 'Tab' && ev.key !== 'Enter') return;
+      const list = [...m.querySelectorAll('input[data-k="price"]')];
+      const next = list[list.indexOf(inp) + (ev.shiftKey ? -1 : 1)];
+      if (!next && ev.key === 'Tab') return; // 마지막 칸에서는 원래대로 이동
+      ev.preventDefault();
+      const e = monthCfg(state.tab).entries.find((x) => x.id === inp.dataset.e);
+      if (e) { e.price = inp.value === '' ? null : +inp.value; e.auto = false; }
+      inp.onchange = null;
+      const y = window.scrollY;
+      commit(true);
+      window.scrollTo(0, y);
+      const el = next && document.querySelector(`input[data-k="price"][data-e="${next.dataset.e}"]`);
+      if (el) { el.focus(); el.select(); }
     };
   });
   m.querySelectorAll('[data-split]').forEach((b) => (b.onclick = () => {
