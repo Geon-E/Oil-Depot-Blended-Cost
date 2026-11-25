@@ -127,6 +127,9 @@ main { max-width: 1280px; margin: 0 auto; padding: 20px; }
 .card .head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
 .card .name { font-weight: 700; font-size: 15px; }
 .card .date { color: var(--text-3); font-size: 12px; }
+.card .date b { color: var(--text); font-size: 14px; }
+.file .upto { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; margin: 2px 0; font-variant-numeric: tabular-nums; }
+.file .upto small { font-size: 12px; font-weight: 500; color: var(--text-3); margin-left: 6px; }
 .fuelrow { display: grid; grid-template-columns: 52px 1fr auto; gap: 4px 10px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
 .fuelrow:first-of-type { border-top: 0; }
 .fuel-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-2); font-weight: 600; }
@@ -500,6 +503,12 @@ const fmtP = (n) => fmt(n, 2);
 const pct = (a, b) => (b ? (a / b) * 100 : null);
 const md = (d) => { const [, m, dd] = d.split('-'); return `${+m}/${+dd}`; };
 const dow = (d) => '일월화수목금토'[new Date(d + 'T00:00:00').getDay()];
+// 최종 자료일이 오늘 기준 며칠 전인지
+const agoText = (d) => {
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  const n = Math.round((t - new Date(d + 'T00:00:00')) / 86400000);
+  return n <= 0 ? '오늘' : n === 1 ? '어제' : `${n}일 전`;
+};
 const uid = () => Math.random().toString(36).slice(2, 9);
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2200); }
 
@@ -734,10 +743,11 @@ function dashBody() {
     if (!p) return `<div class="file missing"><div class="site">${s}</div><div class="meta">원본 없음</div></div>`;
     const off = p.month !== state.month ? ` · <span class="badge warn">${p.month} 자료</span>` : '';
     const src = p.source === 'github' ? ' <span class="badge ok">GitHub</span>' : p.source === 'local' ? ' <span class="badge warn">이 PC만</span>' : '';
-    return `<div class="file"><div class="site">${s} <span class="badge ok">${p.days.length}일</span>${src}${off}</div>
+    const last = p.days.at(-1)?.date;
+    return `<div class="file"><div class="site">${s}${src}${off}</div>
+      <div class="upto">${last ? `${md(last)}(${dow(last)})까지` : '자료 없음'}${last ? `<small>${agoText(last)}</small>` : ''}</div>
       <div class="meta" title="${esc(p.fileName)}">${esc(p.fileName)}</div>
-      <div class="meta">${p.days[0] ? md(p.days[0].date) + ' ~ ' + md(p.days.at(-1).date) : ''}${p.dropped?.length ? ' · 다른 월 시트 ' + p.dropped.length + '개 제외' : ''}</div>
-      ${p.loadedAt ? `<div class="meta">올린 시각 ${new Date(p.loadedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>` : ''}</div>`;
+      ${p.source === 'local' && p.loadedAt ? `<div class="meta">이 PC에서 올린 시각 ${new Date(p.loadedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>` : ''}</div>`;
   }).join('');
   const drop = `<div class="drop" id="drop" tabindex="0" role="button" aria-label="원본 파일 올리기">
       <strong>사업장 원본 엑셀을 여기에 끌어다 놓으세요</strong>
@@ -765,7 +775,7 @@ function dashBody() {
     const outSum = fuels.map((f) => `${FUEL_NAME[f]} ${fmt(L.rows.filter((x) => x.fuel === f).reduce((a, x) => a + x.outQty, 0))}L`).join(' · ');
     const status = c.crit ? `<span class="badge crit">⚠ 확인 ${c.crit}</span>` : c.warn ? `<span class="badge warn">! 참고 ${c.warn}</span>` : `<span class="badge ok">✓ 이상 없음</span>`;
     return `<div class="card" data-goto="${s}" tabindex="0" role="button" aria-label="${s} 상세 보기">
-        <div class="head"><span class="name">${s}</span><span class="date">${md(lastDate)}(${dow(lastDate)}) 마감</span></div>
+        <div class="head"><span class="name">${s}</span><span class="date"><b>${md(lastDate)}(${dow(lastDate)})</b>까지 · ${agoText(lastDate)}</span></div>
         ${rowsHTML}
         <div class="foot"><span>월 출고 ${outSum}</span>${status}</div>
       </div>`;
