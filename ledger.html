@@ -62,7 +62,7 @@ body {
 header.top {
   position: sticky; top: 0; z-index: 20; background: var(--surface); border-bottom: 1px solid var(--line);
 }
-.top-inner { max-width: 1280px; margin: 0 auto; padding: 12px 20px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.top-inner { max-width: 1680px; margin: 0 auto; padding: 12px 20px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
 .brand { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; margin-right: auto; }
 .brand small { font-weight: 500; color: var(--text-3); margin-left: 8px; font-size: 13px; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -81,14 +81,18 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
 button.ghost:hover { background: var(--surface-2); color: var(--text); }
 button:disabled { opacity: .45; cursor: default; }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-nav.tabs { max-width: 1280px; margin: 0 auto; padding: 0 20px; display: flex; gap: 2px; overflow-x: auto; }
+nav.tabs { max-width: 1680px; margin: 0 auto; padding: 0 20px; display: flex; gap: 2px; overflow-x: auto; }
 nav.tabs button {
   border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--text-2);
   padding: 10px 14px; font-size: 14px;
 }
 nav.tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
 nav.tabs .badge { margin-left: 6px; }
-main { max-width: 1280px; margin: 0 auto; padding: 20px; }
+main { max-width: 1680px; margin: 0 auto; padding: 20px; }
+/* 메뉴 화면(hub) 안에 들어갔을 때: 탭은 왼쪽 메뉴가 대신하고, 폭 제한 없이 넓게 */
+.embed nav.tabs { display: none; }
+.embed .top-inner, .embed main { max-width: none; padding-left: 24px; padding-right: 24px; }
+.embed header.top { border-bottom: 1px solid var(--line); }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; }
 .panel h2 { font-size: 15px; margin: 0 0 4px; letter-spacing: -0.01em; }
 .panel .sub { color: var(--text-3); font-size: 13px; margin: 0 0 14px; }
@@ -147,7 +151,7 @@ tr.daybreak td { border-top: 1px solid var(--line-strong); }
 td.muted { color: var(--text-3); }
 td.flag { color: var(--crit); font-weight: 600; }
 td.dest { white-space: normal; min-width: 170px; max-width: 280px; color: var(--text-2); font-size: 12px; line-height: 1.5; }
-td.dest .dq { display: inline-block; margin-right: 10px; white-space: nowrap; }
+td.dest .dq { display: block; white-space: nowrap; }
 td.dest .dq b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
 tfoot td { font-weight: 700; background: var(--surface-2); position: sticky; bottom: 0; }
 input[type=number], input[type=text], input[type=date], select {
@@ -711,7 +715,26 @@ function renderTabs() {
     }
     return `<button role="tab" data-tab="${k}" aria-selected="${state.tab === k}">${label}${badge}</button>`;
   }).join('');
+  notifyHub(tabs);
 }
+// hub(세로 메뉴)와 탭 상태 주고받기: 해시(#침산 등)로 받고, postMessage로 알림
+const EMBED = (() => { try { return window.top !== window && !!window.parent.document.getElementById('frames'); } catch { return false; } })();
+if (EMBED) document.documentElement.classList.add('embed');
+function notifyHub(tabs) {
+  if (!EMBED) return;
+  const items = tabs.map(([k, label]) => {
+    const c = SITES.includes(k) && state.ledgers[k] ? issueCount(k) : { crit: 0, warn: 0 };
+    return { key: k, label, crit: c.crit, warn: c.warn };
+  });
+  try { window.parent.postMessage({ type: 'ledger-tabs', active: state.tab, items }, location.origin); } catch { /* 무시 */ }
+  const h = '#' + encodeURIComponent(state.tab);
+  if (location.hash !== h) history.replaceState(null, '', h);
+}
+function tabFromHash() {
+  const k = decodeURIComponent(location.hash.slice(1));
+  return ['dash', 'settings', ...SITES].includes(k) ? k : null;
+}
+addEventListener('hashchange', () => { const k = tabFromHash(); if (k && k !== state.tab) { state.tab = k; render(); window.scrollTo(0, 0); } });
 
 // --- 대시보드 ---
 function remoteBar() {
@@ -1268,7 +1291,11 @@ const XL = (() => {
         else if (/<sheetPr[^>]*>/.test(x)) x = x.replace(/<sheetPr([^>]*)>/, '<sheetPr$1><pageSetUpPr fitToPage="1"/>');
         else x = x.replace(/(<worksheet[^>]*>)/, '$1<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>');
         const ps = '<pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/>';
-        x = /<pageMargins[^>]*\/>/.test(x) ? x.replace(/(<pageMargins[^>]*\/>)/, `$1${ps}`) : x.replace('</worksheet>', `<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>${ps}</worksheet>`);
+        // 규격상 순서: … mergeCells → pageMargins → pageSetup → … → ignoredErrors
+        x = x.replace(/<pageMargins[^>]*\/>/g, '').replace(/<pageSetup[^>]*\/>/g, '');
+        const pm = `<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>${ps}`;
+        const tail = x.search(/<(headerFooter|rowBreaks|colBreaks|customProperties|cellWatches|ignoredErrors|smartTags|drawing|legacyDrawing|picture|oleObjects|controls|webPublishItems|tableParts|extLst)[\s>\/]/);
+        x = tail >= 0 ? x.slice(0, tail) + pm + x.slice(tail) : x.replace('</worksheet>', `${pm}</worksheet>`);
         e.content = new TextEncoder().encode(x); e.size = e.content.length;
       });
       return XLSX.CFB.write(z, { type: 'array', fileType: 'zip', compression: true });
@@ -1398,6 +1425,7 @@ $('#btnExcel').onclick = () => {
 };
 
 // 이전에 입력한 설정 복원 후 첫 화면
+state.tab = tabFromHash() || state.tab;
 loadParsed();
 pickStateMonth();
 if (state.month) { for (const site of Object.keys(state.parsed)) syncEntries(site); recompute(); }
