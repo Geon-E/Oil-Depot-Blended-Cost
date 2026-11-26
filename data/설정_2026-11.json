@@ -2,7 +2,7 @@
  "app": "storeLedger",
  "version": 1,
  "month": "2026-11",
- "savedAt": "2026-11-25T04:29:44.495834Z",
+ "savedAt": "2026-11-26T07:05:39.721Z",
  "nameMap": {},
  "capacity": {
   "단지": {
@@ -279,6 +279,15 @@
       "qty": 2333,
       "price": null,
       "type": "adj"
+     },
+     {
+      "id": "gdbmg95",
+      "date": "2026-11-25",
+      "fuel": "D",
+      "qty": 32000,
+      "price": 1773,
+      "type": "buy",
+      "auto": false
      }
     ]
    },
@@ -361,6 +370,33 @@
       "qty": 4560,
       "price": null,
       "type": "adj"
+     },
+     {
+      "id": "lloygul",
+      "date": "2026-11-24",
+      "fuel": "D",
+      "qty": 64147,
+      "price": 1773,
+      "type": "buy",
+      "auto": false
+     },
+     {
+      "id": "ka6wft5",
+      "date": "2026-11-25",
+      "fuel": "D",
+      "qty": 62000,
+      "price": 1773,
+      "type": "buy",
+      "auto": false
+     },
+     {
+      "id": "i59c8vj",
+      "date": "2026-11-26",
+      "fuel": "D",
+      "qty": 62000,
+      "price": 1773,
+      "type": "buy",
+      "auto": false
      }
     ]
    }
