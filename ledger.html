@@ -518,6 +518,8 @@ input.need { border-color: var(--crit); background: var(--crit-soft); }
     const set = (ref, o) => { x = put(x, ref, o); };
     set('B1', { str: `◈ KK저장소 복합단가 운영표 - ${ctx.site}저장소` });
     if (ctx.selected) x = x.replace('<sheetView ', '<sheetView tabSelected="1" ');
+    // 입고 시트는 탭을 노란색으로 (sheetPr 안에서 tabColor가 맨 앞)
+    if (ctx.inbound) x = x.replace('<sheetPr>', '<sheetPr><tabColor rgb="FFFFFF00"/>');
     const res = {};
     const F = { K: { capR: 'D9', E: 'E9', G: 'G9', F: 'F9', name: 'C', qty: 'D', fc: 'F', gc: 'G', hc: 'H', sub: 'D23', subH: 'H23', r29: 29, r36: 36, r43: 43, inQ: 'K29', inP: 'M29', inA: 'O29', adj: 'O43' },
                 D: { capR: 'D10', E: 'E10', G: 'G10', F: 'F10', name: 'K', qty: 'L', fc: 'N', gc: 'O', hc: 'P', sub: 'L23', subH: 'P23', r29: 30, r36: 37, r43: 44, inQ: 'K30', inP: 'M30', inA: 'O30', adj: 'O44' } };
@@ -609,7 +611,7 @@ input.need { border-color: var(--crit); background: var(--crit-soft); }
         if (r.adj) { adj[f] = r.adj; hasAdj = true; }
       }
       const md = d.date.slice(5, 7) + d.date.slice(8, 10);
-      if (hasIn) sheets.push({ name: `${md} (입고)`, out: {}, inn, adj: hasOut ? {} : adj, date: d.date, last: !hasOut });
+      if (hasIn) sheets.push({ name: `${md} (입고)`, out: {}, inn, adj: hasOut ? {} : adj, date: d.date, last: !hasOut, inbound: true });
       if (hasOut || (hasAdj && !hasIn)) sheets.push({ name: md, out, inn: {}, adj, date: d.date, last: true });
     }
     return sheets;
@@ -620,7 +622,7 @@ input.need { border-color: var(--crit); background: var(--crit-soft); }
     let open = { K: { qty: num(opening.K?.qty), price: opening.K?.price ?? 0 }, D: { qty: num(opening.D?.qty), price: opening.D?.price ?? 0 } };
     const files = {}, checks = [];
     plan.forEach((p, i) => {
-      const r = buildSheet({ site, cap, prev: i ? plan[i - 1].name : null, open, out: p.out, inn: p.inn, adj: p.adj, selected: i === plan.length - 1 });
+      const r = buildSheet({ site, cap, prev: i ? plan[i - 1].name : null, open, out: p.out, inn: p.inn, adj: p.adj, selected: i === plan.length - 1, inbound: p.inbound });
       files[`xl/worksheets/sheet${i + 1}.xml`] = r.xml;
       open = r.close;
       if (p.last) checks.push({ date: p.date, close: r.close });
