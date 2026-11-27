@@ -23,8 +23,8 @@ var XLSX={};function make_xlsx_lib(a){a.version="0.18.5",a.style_version="1.2.0"
   --text-3: #6b6a65;
   --accent: #2a78d6;
   --accent-soft: #e6f0fc;
-  --s-k: #2a78d6;   /* 등유 */
-  --s-d: #eb6834;   /* 경유 */
+  --s-k: #eb6834;   /* 등유: 주황 */
+  --s-d: #2a78d6;   /* 경유: 파랑 */
   --s-g: #1baf7a;   /* 휘발유 */
   --good: #0ca30c;
   --good-text: #006300;
@@ -40,7 +40,7 @@ var XLSX={};function make_xlsx_lib(a){a.version="0.18.5",a.style_version="1.2.0"
     color-scheme: dark;
     --bg: #121211; --surface: #1a1a19; --surface-2: #242422; --line: #2f2f2c; --line-strong: #45443f;
     --text: #f0efec; --text-2: #c3c2b7; --text-3: #8d8c84; --accent: #3987e5; --accent-soft: #1b2a3d;
-    --s-k: #3987e5; --s-d: #d95926; --s-g: #199e70; --good: #0ca30c; --good-text: #0ca30c;
+    --s-k: #d95926; --s-d: #3987e5; --s-g: #199e70; --good: #0ca30c; --good-text: #0ca30c;
     --warn: #fab219; --warn-soft: #33290f; --crit: #e66767; --crit-soft: #3a1c1c; --input: #121211;
     --zebra: #1e1e1d; --row-hover: #1d2633; --key: #232321; --key-2: #282826;
   }
@@ -49,7 +49,7 @@ var XLSX={};function make_xlsx_lib(a){a.version="0.18.5",a.style_version="1.2.0"
   color-scheme: dark;
   --bg: #121211; --surface: #1a1a19; --surface-2: #242422; --line: #2f2f2c; --line-strong: #45443f;
   --text: #f0efec; --text-2: #c3c2b7; --text-3: #8d8c84; --accent: #3987e5; --accent-soft: #1b2a3d;
-  --s-k: #3987e5; --s-d: #d95926; --s-g: #199e70; --good: #0ca30c; --good-text: #0ca30c;
+  --s-k: #d95926; --s-d: #3987e5; --s-g: #199e70; --good: #0ca30c; --good-text: #0ca30c;
   --warn: #fab219; --warn-soft: #33290f; --crit: #e66767; --crit-soft: #3a1c1c; --input: #121211;
     --zebra: #1e1e1d; --row-hover: #1d2633; --key: #232321; --key-2: #282826;
 }
@@ -1264,7 +1264,7 @@ function lineChart(el, series, yFmt, zeroBase) {
     g += `<text x="${m.l - 8}" y="${Y(v) + 4}" text-anchor="end" font-size="11" fill="var(--text-3)">${shortNum(v)}</text>`;
   }
   const every = Math.ceil(xs.length / 6);
-  xs.forEach((x, i) => { if (i % every === 0 || i === xs.length - 1) g += `<text x="${X(i)}" y="${H - 6}" text-anchor="middle" font-size="11" fill="var(--text-3)">${md(x)}</text>`; });
+  xs.forEach((x, i) => { const last = xs.length - 1; if ((i % every === 0 && last - i >= Math.ceil(every / 2)) || i === last) g += `<text x="${X(i)}" y="${H - 6}" text-anchor="middle" font-size="11" fill="var(--text-3)">${md(x)}</text>`; });
   let lines = '';
   for (const s of series) {
     let d = '', pen = false;
@@ -1495,7 +1495,7 @@ $('#btnLegacy').onclick = async () => {
 const XL = (() => {
   const FONT = '맑은 고딕';
   const INK = '1F2328', INK2 = '3D3C38', MUTED = '6B6A65', LINE = 'E2E1DC', LINE2 = 'B9B7AF', HEAD = 'F2F1EE', TOTAL = 'F7F6F3', RED = 'C62F2F';
-  const TINT = { K: 'E8F1FC', D: 'FDEEE6', G: 'E6F6EF' };
+  const TINT = { K: 'FDEEE6', D: 'E8F1FC', G: 'E6F6EF' };
   const b = (rgb, style = 'thin') => ({ style, color: { rgb } });
   const font = (o = {}) => ({ name: FONT, sz: 10, color: { rgb: INK }, ...o });
   const S = {
