@@ -2,7 +2,7 @@
  "app": "storeLedger",
  "version": 1,
  "month": "2026-11",
- "savedAt": "2026-11-27T02:33:42.419437Z",
+ "savedAt": "2026-11-27T05:02:23.554916Z",
  "nameMap": {},
  "capacity": {
   "단지": {
@@ -294,6 +294,15 @@
       "date": "2026-11-25",
       "fuel": "D",
       "qty": 32000,
+      "price": 1773,
+      "type": "buy",
+      "auto": false
+     },
+     {
+      "id": "cs1126d",
+      "date": "2026-11-26",
+      "fuel": "D",
+      "qty": 28000,
       "price": 1773,
       "type": "buy",
       "auto": false
